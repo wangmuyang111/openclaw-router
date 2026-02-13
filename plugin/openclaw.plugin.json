@@ -1,0 +1,225 @@
+{
+  "id": "soft-router-suggest",
+  "name": "Soft Router (Suggest-only)",
+  "description": "Dry-run soft routing: suggest a model + reason per inbound message; never switches models.",
+  "version": "0.4.0",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {
+        "type": "boolean",
+        "default": true,
+        "description": "Master switch. When false, the plugin does nothing (fail-open)."
+      },
+      "logDir": {
+        "type": "string",
+        "default": "",
+        "description": "Log directory. If empty, plugin auto-derives: %USERPROFILE%/.openclaw/logs"
+      },
+      "logFile": {
+        "type": "string",
+        "default": "soft-router-suggest.jsonl",
+        "description": "Filename (joined with logDir)."
+      },
+      "previewChars": {
+        "type": "integer",
+        "default": 200,
+        "minimum": 0,
+        "maximum": 2000,
+        "description": "Max chars for contentPreview. 0 disables preview logging."
+      },
+      "maxBytes": {
+        "type": "integer",
+        "default": 5242880,
+        "minimum": 0,
+        "description": "Rotate current log when it grows beyond this size (bytes). 0 disables rotation."
+      },
+      "rotateCount": {
+        "type": "integer",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 20,
+        "description": "How many rotated files to keep: .1 .. .N. 0 disables keeping rotated logs."
+      },
+      "availabilityEnabled": {
+        "type": "boolean",
+        "default": false,
+        "description": "When true, emit suggestion.availability (still suggest-only; never switches models)."
+      },
+      "availabilityMode": {
+        "type": "string",
+        "default": "static",
+        "enum": [
+          "static",
+          "cli"
+        ],
+        "description": "static: local heuristics only (no CLI calls). cli: use cached `openclaw models status --json` to estimate auth status."
+      },
+      "availabilityTtlMs": {
+        "type": "integer",
+        "default": 60000,
+        "minimum": 1000,
+        "maximum": 3600000,
+        "description": "Cache TTL for availability (ms). Used in cli mode; also throttles work in static mode."
+      },
+      "availabilityCmdTimeoutMs": {
+        "type": "integer",
+        "default": 500,
+        "minimum": 50,
+        "maximum": 20000,
+        "description": "Timeout for the CLI probe in cli mode (ms). Note: `openclaw models status --json` may take several seconds on Windows; set accordingly."
+      },
+      "availabilityAsyncEnabled": {
+        "type": "boolean",
+        "default": false,
+        "description": "When true, refresh availability auth cache in the background (message_received never blocks on CLI)."
+      },
+      "availabilityMaxStaleMs": {
+        "type": "integer",
+        "default": 3600000,
+        "minimum": 0,
+        "maximum": 86400000,
+        "description": "Maximum age (ms) to keep using stale cached auth when refresh fails. 0 means never use stale cache when expired."
+      },
+      "echoEnabled": {
+        "type": "boolean",
+        "default": false,
+        "description": "When true, append router suggestion feedback to outgoing replies (still suggest-only)."
+      },
+      "echoWhen": {
+        "type": "string",
+        "default": "on_expired",
+        "enum": [
+          "always",
+          "on_expired",
+          "never"
+        ],
+        "description": "When to echo: always / only when availability.auth=expired / never."
+      },
+      "echoMaxChars": {
+        "type": "integer",
+        "default": 280,
+        "minimum": 40,
+        "maximum": 2000,
+        "description": "Max chars of the echoed footer text."
+      },
+      "ruleEngineEnabled": {
+        "type": "boolean",
+        "default": false,
+        "description": "When true, pick suggestion.model by explicit per-kind priority list (still suggest-only unless switchingEnabled=true)."
+      },
+      "switchingEnabled": {
+        "type": "boolean",
+        "default": false,
+        "description": "When true, the plugin may return modelOverride in before_agent_start to actually switch the model for this run."
+      },
+      "switchingMinConfidence": {
+        "type": "string",
+        "default": "high",
+        "enum": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "description": "Only switch when suggestion.confidence >= this threshold."
+      },
+      "switchingAllowChat": {
+        "type": "boolean",
+        "default": false,
+        "description": "If false, never switch for kind=chat."
+      },
+      "modelTagsPath": {
+        "type": "string",
+        "default": "",
+        "description": "Path to model-tags.json. If empty, plugin auto-derives under %USERPROFILE%/.openclaw/workspace/tools/soft-router-suggest/"
+      },
+      "routerRulesPath": {
+        "type": "string",
+        "default": "",
+        "description": "Path to router-rules.json. If empty, plugin auto-derives under %USERPROFILE%/.openclaw/workspace/tools/soft-router-suggest/"
+      },
+      "modelPriorityPath": {
+        "type": "string",
+        "default": "",
+        "description": "Path to model-priority.json. If empty, plugin auto-derives under %USERPROFILE%/.openclaw/workspace/tools/soft-router-suggest/"
+      },
+      "catalogTtlMs": {
+        "type": "integer",
+        "default": 600000,
+        "minimum": 10000,
+        "maximum": 86400000,
+        "description": "TTL for cached `openclaw models list --json` catalog (ms)."
+      },
+      "catalogCmdTimeoutMs": {
+        "type": "integer",
+        "default": 20000,
+        "minimum": 1000,
+        "maximum": 60000,
+        "description": "Timeout for `openclaw models list --json` (ms)."
+      },
+      "setupPromptEnabled": {
+        "type": "boolean",
+        "default": true,
+        "description": "When true, echo a short setup prompt when new models are missing tags."
+      },
+      "setupPromptMaxModels": {
+        "type": "integer",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 20,
+        "description": "Max missing-tag models to mention in the setup prompt footer."
+      },
+      "routerLlmEnabled": {
+        "type": "boolean",
+        "default": false,
+        "description": "(Experimental) When true, attempt to use a Router LLM to pick the best execution model. If unavailable or low-confidence, fall back to the rule engine. NOTE: This build includes scaffolding only unless the runtime exposes an internal model-call API."
+      },
+      "routerLlmModelFallbacks": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "default": [
+          "google-antigravity/gemini-3-flash",
+          "github-copilot/gpt-4o",
+          "google-antigravity/gemini-3-pro-high",
+          "github-copilot/gpt-5-mini"
+        ],
+        "description": "Router LLM fallback chain (first available is used) for routing decisions."
+      },
+      "routerLlmTimeoutMs": {
+        "type": "integer",
+        "default": 2000,
+        "minimum": 200,
+        "maximum": 20000,
+        "description": "Timeout for Router LLM decision call (ms)."
+      },
+      "routerLlmMinConfidence": {
+        "type": "string",
+        "default": "high",
+        "enum": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "description": "Only accept Router LLM decisions at or above this confidence; otherwise fall back to rule engine."
+      },
+      "routerLlmEndpoint": {
+        "type": "string",
+        "default": "http://127.0.0.1:18888/route",
+        "description": "Local sidecar endpoint for Router LLM decisions (Option 1)."
+      },
+      "featureLoggingEnabled": {
+        "type": "boolean",
+        "default": true,
+        "description": "When true, log extracted routing features (keyword hits, hasImage, hasCodeBlock, length buckets) into jsonl for observability."
+      },
+      "openclawCliPath": {
+        "type": "string",
+        "default": "openclaw",
+        "description": "(Portability) Override the OpenClaw CLI path used by this plugin when spawning openclaw models ... commands. Useful for Windows Scheduled Task environments where PATH does not include the npm shim."
+      }
+    }
+  }
+}

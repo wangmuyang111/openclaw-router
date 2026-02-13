@@ -1,0 +1,75 @@
+OpenClaw 硬路由（soft-router-suggest）GitHub 版使用手册
+版本：2026-02-09
+
+============================================================
+1) 安装 / 卸载
+============================================================
+安装（会备份 openclaw.json 并自动写入 plugins.entries.soft-router-suggest；默认启用 RULES 模式）：
+
+  powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
+
+卸载（默认仅禁用插件；如需删除文件加 -RemoveFiles）：
+
+  powershell -ExecutionPolicy Bypass -File .\scripts\uninstall.ps1
+  powershell -ExecutionPolicy Bypass -File .\scripts\uninstall.ps1 -RemoveFiles
+
+============================================================
+2) Doctor 环境检查（只读，不修改任何文件）
+============================================================
+  .\scripts\doctor.ps1
+
+============================================================
+3) 模式切换（不改 profile）
+============================================================
+状态：
+  .\scripts\router.ps1 status
+
+FAST（最快：禁用插件，走默认模型链）：
+  .\scripts\router.ps1 fast
+
+RULES（启用规则引擎：关键词路由）：
+  .\scripts\router.ps1 rules
+
+LLM（规则引擎 + Sidecar Router LLM，可能更慢/受冷却影响）：
+  .\scripts\router.ps1 llm
+
+============================================================
+3) Sidecar 管理（LLM 模式需要）
+============================================================
+启动：
+  .\scripts\router.ps1 sidecar-start
+
+健康检查（浏览器）：
+  http://127.0.0.1:18888/health
+
+停止：
+  .\scripts\router.ps1 sidecar-stop
+
+备注：看到 “Exec failed ... listening ...” 不一定是失败；以 /health 为准。
+
+============================================================
+4) 手动刷新 Model Catalog（可用模型列表）
+============================================================
+默认刷新周期是 10 分钟（catalogTtlMs=600000）。
+如需立刻刷新一次，但不改 TTL：
+
+  .\scripts\router.ps1 catalog-refresh
+
+说明：这是“请求刷新”。下一次消息经过路由时插件会消费旗标并强制刷新。
+
+============================================================
+5) 常用路径（用户机器上）
+============================================================
+OpenClaw home：
+  %USERPROFILE%\.openclaw
+
+插件运行时目录：
+  %USERPROFILE%\.openclaw\workspace\.openclaw\extensions\soft-router-suggest
+
+规则与模型优先级：
+  %USERPROFILE%\.openclaw\workspace\tools\soft-router-suggest\router-rules.json
+  %USERPROFILE%\.openclaw\workspace\tools\soft-router-suggest\model-priority.json
+
+============================================================
+完
+============================================================

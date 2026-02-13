@@ -1,0 +1,225 @@
+{
+  "$schema": "./classification-rules.schema.json",
+  "version": 1,
+  "updatedAt": "2026-02-12T03:07:28.870Z",
+  "notes": "Bilingual rules; model order tuned for availability-first fallback.",
+  "defaultFallback": "fallback",
+  "categories": [
+    {
+      "id": "complex_planning",
+      "name": "复杂规划 / Complex Planning",
+      "priority": 100,
+      "enabled": true,
+      "rules": {
+        "positiveKeywords": [
+          "方案",
+          "规划",
+          "设计",
+          "架构",
+          "planning",
+          "design",
+          "architecture",
+          "system design",
+          "roadmap"
+        ],
+        "negativeKeywords": [
+          "写代码",
+          "调试",
+          "修bug",
+          "write code",
+          "debug",
+          "bug fix"
+        ]
+      },
+      "confidence": {
+        "minSignals": 1,
+        "highSignals": 2
+      },
+      "models": [
+        "openai-codex/gpt-5.3-codex",
+        "openai-codex/gpt-5.2",
+        "google-antigravity/claude-sonnet-4-5-thinking",
+        "google-antigravity/claude-sonnet-4-5"
+      ]
+    },
+    {
+      "id": "vision",
+      "name": "图像任务 / Vision",
+      "priority": 95,
+      "enabled": true,
+      "rules": {
+        "positiveKeywords": [
+          "图片",
+          "图像",
+          "照片",
+          "截图",
+          "看图",
+          "image",
+          "picture",
+          "photo",
+          "screenshot",
+          "visual"
+        ],
+        "metadataConditions": {
+          "hasImage": true
+        }
+      },
+      "confidence": {
+        "minSignals": 1,
+        "highSignals": 1
+      },
+      "models": [
+        "google-antigravity/gemini-3-pro-high",
+        "qwen-portal/vision-model",
+        "github-copilot/gpt-4o"
+      ]
+    },
+    {
+      "id": "coding",
+      "name": "代码任务 / Coding",
+      "priority": 90,
+      "enabled": true,
+      "rules": {
+        "positiveKeywords": [
+          "写代码",
+          "代码",
+          "调试",
+          "报错",
+          "bug",
+          "python",
+          "javascript",
+          "typescript",
+          "coding",
+          "debug",
+          "error"
+        ],
+        "negativeKeywords": [
+          "系统设计",
+          "架构设计",
+          "system design",
+          "architecture design"
+        ]
+      },
+      "confidence": {
+        "minSignals": 1,
+        "highSignals": 2
+      },
+      "models": [
+        "openai-codex/gpt-5.3-codex",
+        "openai-codex/gpt-5.2",
+        "qwen-portal/coder-model"
+      ]
+    },
+    {
+      "id": "text_writing",
+      "name": "文字写作 / Text Writing",
+      "priority": 85,
+      "enabled": true,
+      "rules": {
+        "positiveKeywords": [
+          "翻译",
+          "总结",
+          "润色",
+          "改写",
+          "撰写",
+          "translate",
+          "summarize",
+          "polish",
+          "rewrite",
+          "compose",
+          "draft"
+        ],
+        "negativeKeywords": [
+          "写代码",
+          "调试",
+          "架构",
+          "write code",
+          "debug",
+          "architecture"
+        ],
+        "minLength": 10
+      },
+      "confidence": {
+        "minSignals": 1,
+        "highSignals": 2
+      },
+      "models": [
+        "openai-codex/gpt-5.3-codex",
+        "openai-codex/gpt-5.2",
+        "google-antigravity/claude-sonnet-4-5",
+        "google-antigravity/claude-sonnet-4-5-thinking"
+      ]
+    },
+    {
+      "id": "quick_simple",
+      "name": "简单快速 / Quick Simple",
+      "priority": 80,
+      "enabled": true,
+      "rules": {
+        "positiveKeywords": [
+          "你好",
+          "谢谢",
+          "好的",
+          "翻译",
+          "总结",
+          "hi",
+          "hello",
+          "thanks",
+          "ok",
+          "quick",
+          "simple"
+        ],
+        "negativeKeywords": [
+          "写代码",
+          "架构",
+          "推理",
+          "write code",
+          "architecture",
+          "reasoning"
+        ],
+        "maxLength": 20
+      },
+      "confidence": {
+        "minSignals": 1,
+        "highSignals": 2
+      },
+      "models": [
+        "openai-codex/gpt-5.2",
+        "google-antigravity/gemini-3-flash",
+        "github-copilot/gpt-5-mini"
+      ]
+    },
+    {
+      "id": "fallback",
+      "name": "兜底 / Fallback",
+      "priority": 0,
+      "enabled": true,
+      "rules": {
+        "positiveKeywords": [],
+        "negativeKeywords": []
+      },
+      "confidence": {
+        "minSignals": 0,
+        "highSignals": 0
+      },
+      "models": [
+        "openai-codex/gpt-5.3-codex",
+        "openai-codex/gpt-5.2",
+        "qwen-portal/coder-model",
+        "github-copilot/gpt-4o",
+        "google-antigravity/claude-sonnet-4-5-thinking",
+        "google-antigravity/claude-sonnet-4-5",
+        "google-antigravity/gemini-3-pro-high",
+        "google-antigravity/gemini-3-flash",
+        "qwen-portal/vision-model",
+        "github-copilot/gpt-5-mini"
+      ]
+    }
+  ],
+  "globalSettings": {
+    "conflictResolution": "priority",
+    "defaultConfidence": "low",
+    "enableCache": false,
+    "cacheTtlMs": 60000
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "name": "@openclaw/soft-router-suggest",
+  "version": "0.4.0",
+  "description": "OpenClaw plugin for intelligent model routing with rule engine and optional LLM sidecar",
+  "main": "plugin/index.ts",
+  "type": "module",
+  "keywords": [
+    "openclaw",
+    "plugin",
+    "router",
+    "model-routing",
+    "llm",
+    "ai"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YOUR_USERNAME/OpenClaw-SoftRouter.git"
+  },
+  "bugs": {
+    "url": "https://github.com/YOUR_USERNAME/OpenClaw-SoftRouter/issues"
+  },
+  "homepage": "https://github.com/YOUR_USERNAME/OpenClaw-SoftRouter#readme",
+  "author": "OpenClaw Contributors",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "install": "powershell -ExecutionPolicy Bypass -File ./scripts/install.ps1",
+    "doctor": "powershell -ExecutionPolicy Bypass -File ./scripts/doctor.ps1",
+    "uninstall": "powershell -ExecutionPolicy Bypass -File ./scripts/uninstall.ps1"
+  },
+  "devDependencies": {},
+  "dependencies": {},
+  "openclaw": {
+    "plugin": true,
+    "entry": "plugin/index.ts",
+    "config": "plugin/openclaw.plugin.json"
+  }
+}

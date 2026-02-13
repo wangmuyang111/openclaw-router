@@ -1,0 +1,60 @@
+{
+    "$schema":  "soft-router-suggest:model-tags:v1",
+    "updatedAt":  "2026-02-10T22:00:00.000+08:00",
+    "notes":  "Map modelId -\u003e tags/capabilities. This is the semi-automatic entry point: when you add new models, add/edit tags here so the rule engine can score and recommend.",
+    "models":  {
+                   "openai-codex/gpt-5.2":  {
+                                                "tags":  [
+                                                             "chat",
+                                                             "general",
+                                                             "stable",
+                                                             "tool_use",
+                                                             "coding"
+                                                         ],
+                                                "comment":  "Default stable fallback"
+                                            },
+                   "openai-codex/gpt-5.3-codex":  {
+                                                      "tags":  [
+                                                                   "coding",
+                                                                   "debug",
+                                                                   "tool_use",
+                                                                   "stable"
+                                                               ],
+                                                      "comment":  "Preferred for coding_debug"
+                                                  },
+                   "qwen-portal/vision-model":  {
+                                                    "tags":  [
+                                                                 "vision",
+                                                                 "image",
+                                                                 "multimodal"
+                                                             ],
+                                                    "comment":  "Preferred for vision"
+                                                },
+                   "google-antigravity/gemini-3-flash":  {
+                                                             "tags":  [
+                                                                          "chat",
+                                                                          "fast",
+                                                                          "cheap"
+                                                                      ],
+                                                             "comment":  "Fast chat model (note: auth may expire)"
+                                                         },
+                   "google-antigravity/claude-sonnet-4-5-thinking": {
+                                                             "tags": [
+                                                                  "chat",
+                                                                  "general",
+                                                                  "reasoning",
+                                                                  "thinking",
+                                                                  "stable"
+                                                             ],
+                                                             "comment": "Preferred for deep reasoning / thinking"
+                                                        },
+                   "google-antigravity/claude-sonnet-4-5": {
+                                                             "tags": [
+                                                                  "chat",
+                                                                  "general",
+                                                                  "stable"
+                                                             ],
+                                                             "comment": "Preferred for high-quality general/planning"
+                                                        }
+               }
+}

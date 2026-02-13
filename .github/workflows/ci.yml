@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    name: Lint and Validate
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Validate JSON files
+      shell: pwsh
+      run: |
+        $jsonFiles = Get-ChildItem -Recurse -Filter *.json
+        foreach ($file in $jsonFiles) {
+          Write-Host "Validating $($file.FullName)"
+          Get-Content $file.FullName | ConvertFrom-Json | Out-Null
+        }
+    
+    - name: Check for sensitive data
+      shell: pwsh
+      run: |
+        $patterns = @(
+          'C:\\Users\\[^\\]+',
+          '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}',
+          'sk-[a-zA-Z0-9]{20,}',
+          'token\"\s*:\s*\"[A-Za-z0-9_-]{16,}',
+          'auth\"\s*:\s*\{[\s\S]{0,200}token'
+        )
+
+        $files = Get-ChildItem -Recurse -File | Where-Object { $_.FullName -notmatch '\\.git\\' }
+        $found = $false
+        foreach ($pattern in $patterns) {
+          $matches = $files | Select-String -Pattern $pattern
+          if ($matches) {
+            Write-Error "Found sensitive pattern: $pattern"
+            $matches | Select-Object -First 20 | ForEach-Object { Write-Host ("$($_.Path):$($_.LineNumber): $($_.Line)") }
+            $found = $true
+          }
+        }
+        
+        if ($found) {
+          exit 1
+        }
+        Write-Host "✓ No sensitive data detected"
+
+  test:
+    name: Test Scripts
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Test PowerShell syntax
+      shell: pwsh
+      run: |
+        $scripts = Get-ChildItem -Path ./scripts -Filter *.ps1
+        foreach ($script in $scripts) {
+          Write-Host "Testing $($script.Name)"
+          $null = [System.Management.Automation.PSParser]::Tokenize(
+            (Get-Content $script.FullName -Raw), 
+            [ref]$null
+          )
+        }
+        Write-Host "✓ All scripts have valid syntax"
+    
+    - name: Validate .gitignore
+      shell: pwsh
+      run: |
+        if (-not (Test-Path .gitignore)) {
+          Write-Error ".gitignore not found"
+          exit 1
+        }
+        $content = Get-Content .gitignore
+        if ($content -notcontains "*.log") {
+          Write-Warning ".gitignore should include *.log"
+        }
+        Write-Host "✓ .gitignore exists"
+
+  docs:
+    name: Documentation Check
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Check required files
+      shell: pwsh
+      run: |
+        $required = @('README.md', 'LICENSE', 'CHANGELOG.md', 'CONTRIBUTING.md')
+        $missing = @()
+        foreach ($file in $required) {
+          if (-not (Test-Path $file)) {
+            $missing += $file
+          }
+        }
+        if ($missing.Count -gt 0) {
+          Write-Error "Missing required files: $($missing -join ', ')"
+          exit 1
+        }
+        Write-Host "✓ All required documentation files present"

@@ -1,0 +1,21 @@
+# Runtime / local
+*.log
+*.jsonl
+logs/
+backups/
+
+# OpenClaw local config/state
+openclaw.json
+*.bak.*
+*.bak
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+
+# Editor
+.vscode/
+.idea/
