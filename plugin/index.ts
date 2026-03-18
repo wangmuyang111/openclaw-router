@@ -19,11 +19,11 @@ import { promisify } from "node:util";
 import {
   loadClassificationRules,
   type ClassificationRulesConfig,
-} from "./classification-loader.js";
+} from "./classification-loader.ts";
 import {
   classifyContent,
   type ClassificationResult,
-} from "./classification-engine.js";
+} from "./classification-engine.ts";
 
 type PluginConfig = {
   enabled?: boolean;

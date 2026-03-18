@@ -45,6 +45,8 @@ Write-Host "Workspace: $workspace"
 
 # 1) Copy plugin
 Copy-Item -Force (Join-Path $repoRoot 'plugin\index.ts') (Join-Path $extDir 'index.ts')
+Copy-Item -Force (Join-Path $repoRoot 'plugin\classification-loader.ts') (Join-Path $extDir 'classification-loader.ts')
+Copy-Item -Force (Join-Path $repoRoot 'plugin\classification-engine.ts') (Join-Path $extDir 'classification-engine.ts')
 Copy-Item -Force (Join-Path $repoRoot 'plugin\openclaw.plugin.json') (Join-Path $extDir 'openclaw.plugin.json')
 Write-Host "OK: plugin copied -> $extDir"
 

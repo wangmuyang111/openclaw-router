@@ -6,7 +6,7 @@ import type {
   ClassificationRulesConfig,
   Category,
   ClassificationRuleSet,
-} from "./classification-loader.js";
+} from "./classification-loader.ts";
 
 // ============================================================================
 // Types
