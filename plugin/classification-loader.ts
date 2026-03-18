@@ -7,6 +7,7 @@
 
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import * as os from "node:os";
 
 // ============================================================================
 // Types (based on classification-rules.schema.json)
@@ -76,7 +77,19 @@ let configCache: {
   filePath: string;
 } | null = null;
 
-const DEFAULT_CONFIG_PATH = "C:/Users/muyang/.openclaw/workspace/tools/soft-router-suggest/classification-rules.json";
+function getOpenClawHome(): string {
+  return process.env.OPENCLAW_HOME ?? path.join(os.homedir(), ".openclaw");
+}
+
+function getWorkspaceDir(): string {
+  return process.env.OPENCLAW_WORKSPACE ?? path.join(getOpenClawHome(), "workspace");
+}
+
+function getDefaultToolsDir(): string {
+  return path.join(getWorkspaceDir(), "tools", "soft-router-suggest");
+}
+
+const DEFAULT_CONFIG_PATH = path.join(getDefaultToolsDir(), "classification-rules.json");
 
 // ============================================================================
 // Configuration Loader

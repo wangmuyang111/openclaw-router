@@ -890,7 +890,7 @@ async function computeAvailability(params: {
 function preview(text: string, n: number) {
   const t = (text ?? "").replace(/\r\n/g, "\n");
   if (t.length <= n) return t;
-  return t.slice(0, n) + `鈥?+${t.length - n} chars)`;
+  return t.slice(0, n) + `... (+${t.length - n} chars)`;
 }
 
 type Confidence = "low" | "medium" | "high";
@@ -968,19 +968,24 @@ async function appendJsonl(api: OpenClawPluginApi, obj: unknown) {
 // Dedup map (in-memory, per process).
 const recentOverrides = new Map<string, number>();
 
-async function shouldLogModelOverride(cfg: PluginConfig, sessionKey: string, pickedModel: string) {
+async function shouldLogModelOverride(
+  cfg: { logDir: string },
+  sessionKey: string,
+  pickedModel: string,
+) {
   const memKey = `${sessionKey}:${pickedModel}`;
   const now = Date.now();
-  
+
   // In-process check
   const last = recentOverrides.get(memKey);
   if (last && now - last < 1000) return false;
 
   // Cross-process atomic lock (1-second bucket)
   try {
-    const dedupDir = path.join(cfg.logDir ?? os.tmpdir(), ".dedup");
+    const baseDir = cfg.logDir && cfg.logDir.trim() ? cfg.logDir : os.tmpdir();
+    const dedupDir = path.join(baseDir, ".dedup");
     await fs.mkdir(dedupDir, { recursive: true });
-    
+
     const secondBucket = Math.floor(now / 1000);
     const hash = crypto.createHash("sha1").update(memKey).digest("hex");
     const marker = path.join(dedupDir, `soft-router-model-override-${hash}-${secondBucket}.lock`);
@@ -988,7 +993,7 @@ async function shouldLogModelOverride(cfg: PluginConfig, sessionKey: string, pic
     try {
       await fs.writeFile(marker, String(now), { encoding: "utf8", flag: "wx" });
     } catch (e: any) {
-      if (String(e?.code) === "EEXIST") return false;
+      if (String((e as any)?.code) === "EEXIST") return false;
     }
   } catch {
     // fail-open
@@ -1081,7 +1086,7 @@ export default function register(api: OpenClawPluginApi) {
         const sessionKey = String((ctx as any)?.sessionKey ?? "unknown");
         const promptHash = crypto.createHash("sha1").update(promptText).digest("hex").slice(0, 16);
 
-        const okToLog = await shouldLogModelOverride(cfg, sessionKey, picked.picked);
+        const okToLog = await shouldLogModelOverride({ logDir: cfg.logDir }, sessionKey, picked.picked);
         if (!okToLog) {
           // Debug: log dedup skip to prove this path is being hit.
           try {

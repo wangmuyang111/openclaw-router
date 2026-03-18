@@ -1,7 +1,7 @@
 {
   "id": "soft-router-suggest",
-  "name": "Soft Router (Suggest-only)",
-  "description": "Dry-run soft routing: suggest a model + reason per inbound message; never switches models.",
+  "name": "Soft Router (Auto-switch)",
+  "description": "Soft routing with rule engine: can switch execution model via before_agent_start (configurable).",
   "version": "0.4.0",
   "configSchema": {
     "type": "object",
