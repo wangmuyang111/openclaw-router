@@ -15,6 +15,8 @@ import * as os from "node:os";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
+// NOTE: Gateway runs plugins in Node; console.log() becomes gateway log output.
+
 // Configuration-driven classification
 import {
   loadClassificationRules,
@@ -1121,6 +1123,18 @@ export default function register(api: OpenClawPluginApi) {
           note: picked.note,
           promptHash,
         });
+
+        // Emit a clear gateway log line for quick verification.
+        // (This is intentionally one-line and stable for grep.)
+        try {
+          console.log(
+            `[soft-router-suggest] model_override sessionKey=${sessionKey} agentId=${String(
+              (ctx as any)?.agentId ?? "",
+            )} kind=${suggestion.kind} confidence=${suggestion.confidence} picked=${picked.picked} promptHash=${promptHash}`,
+          );
+        } catch {
+          // ignore
+        }
 
         return { modelOverride: picked.picked };
       } catch {
