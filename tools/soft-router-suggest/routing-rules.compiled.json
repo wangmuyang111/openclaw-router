@@ -1,0 +1,11 @@
+{
+  "$schema": "soft-router-suggest:routing-rules.compiled:v1",
+  "version": 1,
+  "compiledAt": "2026-03-19T04:32:30.000Z",
+  "source": {
+    "base": "keyword-library.json",
+    "overrides": "keyword-overrides.user.json"
+  },
+  "defaultFallbackKind": "chat",
+  "kinds": []
+}

@@ -144,6 +144,26 @@
         "default": "",
         "description": "Path to model-priority.json. If empty, plugin auto-derives under %USERPROFILE%/.openclaw/workspace/tools/soft-router-suggest/"
       },
+      "keywordLibraryPath": {
+        "type": "string",
+        "default": "",
+        "description": "Path to keyword-library.json. Auto-derived if empty."
+      },
+      "keywordOverridesPath": {
+        "type": "string",
+        "default": "",
+        "description": "Path to keyword-overrides.user.json. Auto-derived if empty."
+      },
+      "routingRulesCompiledPath": {
+        "type": "string",
+        "default": "",
+        "description": "Path to routing-rules.compiled.json. Auto-derived if empty."
+      },
+      "keywordCustomEnabled": {
+        "type": "boolean",
+        "default": true,
+        "description": "Enable keyword library + user overrides."
+      },
       "catalogTtlMs": {
         "type": "integer",
         "default": 600000,
@@ -181,10 +201,7 @@
           "type": "string"
         },
         "default": [
-          "google-antigravity/gemini-3-flash",
-          "github-copilot/gpt-4o",
-          "google-antigravity/gemini-3-pro-high",
-          "github-copilot/gpt-5-mini"
+          "openai-codex/gpt-5.2"
         ],
         "description": "Router LLM fallback chain (first available is used) for routing decisions."
       },

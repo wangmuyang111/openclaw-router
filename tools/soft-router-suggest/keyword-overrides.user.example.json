@@ -1,0 +1,28 @@
+{
+  "$schema": "./keyword-overrides.user.schema.json",
+  "version": 1,
+  "updatedAt": "2026-03-19T04:28:00.000Z",
+  "notes": "Example user overrides. Copy to keyword-overrides.user.json to take effect. Use ONLY paste input in UI; one term per line. Lines starting with # are comments.",
+  "sets": {
+    "planning.strong": {
+      "add": [
+        "排期方案",
+        "项目蓝图"
+      ],
+      "remove": [
+        "gantt"
+      ]
+    },
+    "coding.negative": {
+      "add": [
+        "投标",
+        "报价单"
+      ],
+      "remove": []
+    }
+  },
+  "kinds": {
+    "planning": { "enabled": true },
+    "chat": { "enabled": true }
+  }
+}

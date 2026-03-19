@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Soft Router Keyword Library",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "keywordSets", "kinds"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "integer", "minimum": 1 },
+    "updatedAt": { "type": "string" },
+    "notes": { "type": "string" },
+    "defaultFallbackKind": { "type": "string" },
+    "normalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "lowercase": { "type": "boolean", "default": true },
+        "trim": { "type": "boolean", "default": true },
+        "collapseWhitespace": { "type": "boolean", "default": true }
+      }
+    },
+    "keywordSets": {
+      "type": "object",
+      "description": "Named keyword sets. Keys like planning.strong, coding.negative.",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "default": {}
+    },
+    "kinds": {
+      "type": "object",
+      "description": "Kind rules (9 kinds).",
+      "additionalProperties": {
+        "$ref": "#/$defs/kindRule"
+      },
+      "default": {}
+    }
+  },
+  "$defs": {
+    "signalSetRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["set", "weight"],
+      "properties": {
+        "set": { "type": "string" },
+        "weight": { "type": "number" },
+        "match": { "type": "string", "enum": ["contains"], "default": "contains" },
+        "exclude": { "type": "boolean", "default": false }
+      }
+    },
+    "metadataSignal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field", "equals", "weight"],
+      "properties": {
+        "field": { "type": "string", "enum": ["hasImage", "hasCodeBlock"] },
+        "equals": { "type": "boolean" },
+        "weight": { "type": "number" },
+        "exclude": { "type": "boolean", "default": false }
+      }
+    },
+    "regexSignal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pattern", "weight"],
+      "properties": {
+        "pattern": { "type": "string" },
+        "flags": { "type": "string", "default": "i" },
+        "weight": { "type": "number" }
+      }
+    },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "minScore": { "type": "number", "default": 2 },
+        "highScore": { "type": "number", "default": 6 },
+        "minStrongHits": { "type": "integer", "default": 0, "minimum": 0 }
+      }
+    },
+    "modelPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy", "list"],
+      "properties": {
+        "strategy": { "type": "string", "enum": ["priority_list"] },
+        "list": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "kindRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "priority", "signals", "thresholds", "models"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "priority": { "type": "integer" },
+        "enabled": { "type": "boolean", "default": true },
+        "signals": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "positive": { "type": "array", "items": { "$ref": "#/$defs/signalSetRef" }, "default": [] },
+            "negative": { "type": "array", "items": { "$ref": "#/$defs/signalSetRef" }, "default": [] },
+            "metadata": { "type": "array", "items": { "$ref": "#/$defs/metadataSignal" }, "default": [] },
+            "regex": { "type": "array", "items": { "$ref": "#/$defs/regexSignal" }, "default": [] }
+          },
+          "required": ["positive", "negative", "metadata", "regex"]
+        },
+        "thresholds": { "$ref": "#/$defs/thresholds" },
+        "models": { "$ref": "#/$defs/modelPolicy" }
+      }
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Soft Router Keyword Overrides (User)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "integer", "minimum": 1 },
+    "updatedAt": { "type": "string" },
+    "notes": { "type": "string" },
+    "sets": {
+      "type": "object",
+      "description": "Per set add/remove overlays. Keys are set ids like planning.strong, coding.negative.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "add": {
+            "type": "array",
+            "items": { "type": "string" },
+            "default": []
+          },
+          "remove": {
+            "type": "array",
+            "items": { "type": "string" },
+            "default": []
+          }
+        }
+      },
+      "default": {}
+    },
+    "kinds": {
+      "type": "object",
+      "description": "Optional kind-level enable/disable overrides.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": { "type": "boolean" }
+        }
+      },
+      "default": {}
+    }
+  }
+}

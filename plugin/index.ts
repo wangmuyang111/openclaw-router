@@ -27,6 +27,10 @@ import {
   type ClassificationResult,
 } from "./classification-engine.ts";
 
+// NEW: keyword library + weighted routing (for user-custom keyword add/remove)
+import { loadAndCompileRoutingRules } from "./keyword-library.ts";
+import { routeByWeightedRules } from "./weighted-routing-engine.ts";
+
 type PluginConfig = {
   enabled?: boolean;
   logDir?: string;
@@ -55,6 +59,10 @@ type PluginConfig = {
   modelTagsPath?: string;
   routerRulesPath?: string;
   modelPriorityPath?: string;
+  keywordLibraryPath?: string;
+  keywordOverridesPath?: string;
+  routingRulesCompiledPath?: string;
+  keywordCustomEnabled?: boolean;
   catalogTtlMs?: number;
   catalogCmdTimeoutMs?: number;
   setupPromptEnabled?: boolean;
@@ -105,6 +113,10 @@ const DEFAULTS = {
   get modelTagsPath() { return path.join(getDefaultToolsDir(), "model-tags.json"); },
   get routerRulesPath() { return path.join(getDefaultToolsDir(), "router-rules.json"); },
   get modelPriorityPath() { return path.join(getDefaultToolsDir(), "model-priority.json"); },
+  get keywordLibraryPath() { return path.join(getDefaultToolsDir(), "keyword-library.json"); },
+  get keywordOverridesPath() { return path.join(getDefaultToolsDir(), "keyword-overrides.user.json"); },
+  get routingRulesCompiledPath() { return path.join(getDefaultToolsDir(), "routing-rules.compiled.json"); },
+  keywordCustomEnabled: true,
   catalogTtlMs: 600_000,
   catalogCmdTimeoutMs: 20_000,
   setupPromptEnabled: true,
@@ -205,6 +217,21 @@ function resolveConfig(api: OpenClawPluginApi): Required<typeof DEFAULTS> {
     typeof cfg.modelPriorityPath === "string" && cfg.modelPriorityPath.trim()
       ? cfg.modelPriorityPath
       : DEFAULTS.modelPriorityPath;
+  const keywordLibraryPath =
+    typeof cfg.keywordLibraryPath === "string" && cfg.keywordLibraryPath.trim()
+      ? cfg.keywordLibraryPath
+      : DEFAULTS.keywordLibraryPath;
+  const keywordOverridesPath =
+    typeof cfg.keywordOverridesPath === "string" && cfg.keywordOverridesPath.trim()
+      ? cfg.keywordOverridesPath
+      : DEFAULTS.keywordOverridesPath;
+  const routingRulesCompiledPath =
+    typeof cfg.routingRulesCompiledPath === "string" && cfg.routingRulesCompiledPath.trim()
+      ? cfg.routingRulesCompiledPath
+      : DEFAULTS.routingRulesCompiledPath;
+  const keywordCustomEnabled =
+    typeof cfg.keywordCustomEnabled === "boolean" ? cfg.keywordCustomEnabled : DEFAULTS.keywordCustomEnabled;
+
   const catalogTtlMs = clampInt(cfg.catalogTtlMs, 10_000, 86_400_000, DEFAULTS.catalogTtlMs);
   const catalogCmdTimeoutMs = clampInt(
     cfg.catalogCmdTimeoutMs,
@@ -246,6 +273,10 @@ function resolveConfig(api: OpenClawPluginApi): Required<typeof DEFAULTS> {
     modelTagsPath,
     routerRulesPath,
     modelPriorityPath,
+    keywordLibraryPath,
+    keywordOverridesPath,
+    routingRulesCompiledPath,
+    keywordCustomEnabled,
     catalogTtlMs,
     catalogCmdTimeoutMs,
     setupPromptEnabled,
@@ -792,29 +823,73 @@ async function getClassificationConfig(): Promise<ClassificationRulesConfig> {
 }
 
 /**
- * NEW: Configuration-driven classification (async)
+ * Classification (async)
+ *
+ * Preference order:
+ * 1) Weighted keyword library (keyword-library.json + optional keyword-overrides.user.json)
+ * 2) Legacy classification-rules.json (kept for backward compatibility)
  */
 async function classifyDynamic(
+  api: OpenClawPluginApi,
   content: string,
   metadata?: Record<string, unknown>
 ): Promise<Suggestion> {
   try {
+    // NEW: weighted routing based on keyword library + user paste overrides.
+    // Fail-open: any error falls back to the legacy classifier.
+    // Note: resolveConfig is stable; we call it here to access keyword library paths.
+    const cfgAny = resolveConfig(api);
+    if (cfgAny.keywordCustomEnabled) {
+      try {
+        const { compiled, warnings } = await loadAndCompileRoutingRules({
+          libraryPath: cfgAny.keywordLibraryPath,
+          overridesPath: cfgAny.keywordOverridesPath,
+        });
+
+        const decision = routeByWeightedRules({
+          rules: compiled,
+          content,
+          metadata,
+          maxExplainTerms: 10,
+        });
+
+        // Per requirement: do NOT switch models lightly. Keep execution on gpt-5.2 by default.
+        // The router still computes kind/confidence/explanations; model switching (if ever) is handled separately.
+        const model = "openai-codex/gpt-5.2";
+
+        const signals = [
+          "weighted_keyword_library",
+          ...decision.signals,
+          ...(warnings.length ? ["keyword_library_warnings"] : []),
+        ];
+
+        return {
+          kind: decision.kind,
+          model,
+          reason: decision.reason + (warnings.length ? ` (warnings=${warnings.length})` : ""),
+          signals,
+          confidence: decision.confidence,
+        };
+      } catch {
+        // fall through to legacy classifier
+      }
+    }
+
+    // Legacy: classification-rules.json
     const config = await getClassificationConfig();
     const result = classifyContent(content, metadata, config);
 
-    // Convert ClassificationResult to Suggestion format
     return {
       kind: result.categoryId,
-      model: result.models[0] ?? "google-antigravity/claude-sonnet-4-5-thinking",
+      model: "openai-codex/gpt-5.2",
       reason: result.reason,
       signals: result.signals,
       confidence: result.confidence,
     };
   } catch (err) {
-    // Fallback on error
     return {
       kind: "fallback",
-      model: "google-antigravity/claude-sonnet-4-5-thinking",
+      model: "openai-codex/gpt-5.2",
       reason: `Classification error: ${err instanceof Error ? err.message : String(err)}`,
       signals: ["error_fallback"],
       confidence: "low",
@@ -823,14 +898,8 @@ async function classifyDynamic(
 }
 
 function pickFallbackModel(kind: Suggestion["kind"]) {
-  // Keep it simple and reliable: prefer OpenAI Codex when available.
-  // We intentionally do NOT attempt to validate model allowlists here; this is suggest-only.
-  if (kind === "coding") return "openai-codex/gpt-5.3-codex";
-  if (kind === "vision") return "qwen-portal/vision-model";
-  if (kind === "complex_planning") return "google-antigravity/claude-sonnet-4-5-thinking";
-  if (kind === "text_writing") return "google-antigravity/claude-sonnet-4-5";
-  if (kind === "quick_simple") return "google-antigravity/gemini-3-flash";
-  return "google-antigravity/claude-sonnet-4-5-thinking"; // fallback
+  // Keep it simple and reliable: always use gpt-5.2 as the hard fallback.
+  return "openai-codex/gpt-5.2";
 }
 
 async function computeAvailability(params: {
@@ -1061,7 +1130,7 @@ export default function register(api: OpenClawPluginApi) {
         if (!cfg.enabled || !cfg.ruleEngineEnabled || !cfg.switchingEnabled) return;
 
         const promptText = String(event.prompt ?? "");
-        const suggestion = await classifyDynamic(promptText, undefined);
+        const suggestion = await classifyDynamic(api, promptText, undefined);
 
         // Policy gates (user-confirmed):
         // - only confidence>=min
@@ -1147,7 +1216,7 @@ export default function register(api: OpenClawPluginApi) {
     "message_received",
     async (event: PluginHookMessageReceivedEvent, ctx: PluginHookMessageContext) => {
       try {
-        const suggestion = await classifyDynamic(event.content, event.metadata);
+        const suggestion = await classifyDynamic(api, event.content, event.metadata);
         const cfg = resolveConfig(api);
 
         // Optional: rule engine overrides suggestion.model by scoring catalog + tags + rules.

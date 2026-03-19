@@ -5,51 +5,22 @@
   "notes": "Reordered to prioritize always-available models and reduce unavailable-delay risk.",
   "kinds": {
     "complex_planning": [
-      "openai-codex/gpt-5.3-codex",
-      "openai-codex/gpt-5.2",
-      "google-antigravity/claude-sonnet-4-5-thinking",
-      "google-antigravity/claude-sonnet-4-5",
-      "google-antigravity/gemini-3-pro-high",
-      "github-copilot/gpt-4o"
+      "openai-codex/gpt-5.2"
     ],
     "coding": [
-      "openai-codex/gpt-5.3-codex",
-      "openai-codex/gpt-5.2",
-      "google-antigravity/gemini-3-pro-high",
-      "qwen-portal/coder-model",
-      "github-copilot/gpt-4o"
+      "openai-codex/gpt-5.2"
     ],
     "vision": [
-      "google-antigravity/gemini-3-pro-high",
-      "openai-codex/gpt-5.2",
-      "qwen-portal/vision-model",
-      "github-copilot/gpt-4o"
+      "openai-codex/gpt-5.2"
     ],
     "quick_simple": [
-      "openai-codex/gpt-5.2",
-      "google-antigravity/gemini-3-flash",
-      "github-copilot/gpt-5-mini",
-      "github-copilot/gpt-4o"
+      "openai-codex/gpt-5.2"
     ],
     "text_writing": [
-      "openai-codex/gpt-5.3-codex",
-      "openai-codex/gpt-5.2",
-      "google-antigravity/claude-sonnet-4-5",
-      "google-antigravity/claude-sonnet-4-5-thinking",
-      "google-antigravity/gemini-3-pro-high",
-      "github-copilot/gpt-4o"
+      "openai-codex/gpt-5.2"
     ],
     "fallback": [
-      "openai-codex/gpt-5.3-codex",
-      "openai-codex/gpt-5.2",
-      "qwen-portal/coder-model",
-      "github-copilot/gpt-4o",
-      "google-antigravity/claude-sonnet-4-5-thinking",
-      "google-antigravity/claude-sonnet-4-5",
-      "google-antigravity/gemini-3-pro-high",
-      "google-antigravity/gemini-3-flash",
-      "qwen-portal/vision-model",
-      "github-copilot/gpt-5-mini"
+      "openai-codex/gpt-5.2"
     ]
   }
 }
