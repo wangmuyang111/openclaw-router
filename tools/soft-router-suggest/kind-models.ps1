@@ -63,6 +63,30 @@ function Split-List([string]$s) {
   return @($s.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' })
 }
 
+$catalogScript = Join-Path $PSScriptRoot 'catalog.ps1'
+
+function Get-CatalogIds {
+  try {
+    if (Test-Path $catalogScript) {
+      return @(& $catalogScript)
+    }
+  } catch {}
+  return @()
+}
+
+function Assert-ValidModelId([string]$mid) {
+  if ([string]::IsNullOrWhiteSpace($mid)) { throw "-ModelId is required" }
+  # Basic safety: require provider/model form.
+  if ($mid -notmatch '^[a-z0-9][a-z0-9-]*\/[A-Za-z0-9][A-Za-z0-9._-]*$') {
+    throw "Invalid ModelId '$mid'. Must be like provider/model (e.g. local-proxy/gpt-5.2)."
+  }
+
+  $ids = Get-CatalogIds
+  if ($ids.Count -gt 0 -and ($ids -notcontains $mid)) {
+    throw "ModelId '$mid' not in current catalog. Please pick from the catalog list (menu Add model) or refresh catalog."
+  }
+}
+
 $lib = Load-Library
 
 switch ($Command) {
@@ -82,7 +106,8 @@ switch ($Command) {
 
   'add' {
     if ([string]::IsNullOrWhiteSpace($Kind)) { throw "-Kind is required" }
-    if ([string]::IsNullOrWhiteSpace($ModelId)) { throw "-ModelId is required" }
+    Assert-ValidModelId $ModelId
+
     $list = New-Object System.Collections.Generic.List[string]
     (Get-ModelList $lib $Kind) | ForEach-Object { [void]$list.Add([string]$_) }
     if ($list.Contains($ModelId)) { throw "Model already exists in kind '$Kind': $ModelId" }
@@ -121,7 +146,7 @@ switch ($Command) {
 
   'top' {
     if ([string]::IsNullOrWhiteSpace($Kind)) { throw "-Kind is required" }
-    if ([string]::IsNullOrWhiteSpace($ModelId)) { throw "-ModelId is required" }
+    Assert-ValidModelId $ModelId
     $cur = New-Object System.Collections.Generic.List[string]
     (Get-ModelList $lib $Kind) | ForEach-Object { [void]$cur.Add([string]$_) }
     $idx = $cur.IndexOf($ModelId)
