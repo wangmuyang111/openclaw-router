@@ -12,10 +12,7 @@ $overridesScript = Join-Path $toolsDir 'manage-overrides.ps1'
 $previewScript = Join-Path $toolsDir 'route-preview.ps1'
 $libraryPath = Join-Path $toolsDir 'keyword-library.json'
 
-function Pause-Any {
-  Write-Host
-  Read-Host 'Press Enter to continue' | Out-Null
-}
+# No pause prompts: keep the menu fast. Output remains in scrollback.
 
 function Safe-Clear {
   # Some non-interactive hosts throw when clearing screen.
@@ -297,7 +294,6 @@ function Run-Models {
       } catch {
         Write-Host ("ERROR: " + $_.Exception.Message) -ForegroundColor Red
         Write-Host
-        Read-Host 'Press Enter to continue' | Out-Null
       }
     }
   }
