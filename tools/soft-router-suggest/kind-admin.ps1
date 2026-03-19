@@ -70,17 +70,9 @@ $lib = Load-Json $LibraryPath
 
 switch ($Command) {
   'list' {
-    Write-Output "kind\tenabled\tpriority\tmodels"
+    # Output ONLY kind ids (one per line) for readability and easy piping.
     foreach ($p in (Get-KindProps $lib | Sort-Object Name)) {
-      $k = $p.Name
-      $kr = $p.Value
-      $enabled = $true
-      if ($kr.PSObject.Properties.Name -contains 'enabled') { $enabled = ($kr.enabled -ne $false) }
-      $priority = 0
-      if ($kr.PSObject.Properties.Name -contains 'priority') { $priority = [int]$kr.priority }
-      $models = ''
-      try { $models = (@($kr.models.list) -join ',') } catch { $models = '' }
-      Write-Output ("{0}\t{1}\t{2}\t{3}" -f $k, $enabled, $priority, $models)
+      Write-Output $p.Name
     }
   }
 
