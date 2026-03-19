@@ -134,11 +134,6 @@
         "default": "",
         "description": "Path to model-tags.json. If empty, plugin auto-derives under %USERPROFILE%/.openclaw/workspace/tools/soft-router-suggest/"
       },
-      "routerRulesPath": {
-        "type": "string",
-        "default": "",
-        "description": "Path to router-rules.json. If empty, plugin auto-derives under %USERPROFILE%/.openclaw/workspace/tools/soft-router-suggest/"
-      },
       "modelPriorityPath": {
         "type": "string",
         "default": "",
@@ -201,7 +196,7 @@
           "type": "string"
         },
         "default": [
-          "openai-codex/gpt-5.2"
+          "local-proxy/gpt-5.2"
         ],
         "description": "Router LLM fallback chain (first available is used) for routing decisions."
       },

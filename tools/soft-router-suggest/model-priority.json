@@ -5,22 +5,22 @@
   "notes": "Reordered to prioritize always-available models and reduce unavailable-delay risk.",
   "kinds": {
     "complex_planning": [
-      "openai-codex/gpt-5.2"
+      "local-proxy/gpt-5.2"
     ],
     "coding": [
-      "openai-codex/gpt-5.2"
+      "local-proxy/gpt-5.2"
     ],
     "vision": [
-      "openai-codex/gpt-5.2"
+      "local-proxy/gpt-5.2"
     ],
     "quick_simple": [
-      "openai-codex/gpt-5.2"
+      "local-proxy/gpt-5.2"
     ],
     "text_writing": [
-      "openai-codex/gpt-5.2"
+      "local-proxy/gpt-5.2"
     ],
     "fallback": [
-      "openai-codex/gpt-5.2"
+      "local-proxy/gpt-5.2"
     ]
   }
 }

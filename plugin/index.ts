@@ -18,14 +18,8 @@ import { promisify } from "node:util";
 // NOTE: Gateway runs plugins in Node; console.log() becomes gateway log output.
 
 // Configuration-driven classification
-import {
-  loadClassificationRules,
-  type ClassificationRulesConfig,
-} from "./classification-loader.ts";
-import {
-  classifyContent,
-  type ClassificationResult,
-} from "./classification-engine.ts";
+// Legacy classification engine removed: we fully converge on the weighted keyword-library engine.
+// (Files remain in repo for reference/compat but are no longer loaded at runtime.)
 
 // NEW: keyword library + weighted routing (for user-custom keyword add/remove)
 import { loadAndCompileRoutingRules } from "./keyword-library.ts";
@@ -57,7 +51,6 @@ type PluginConfig = {
   switchingAllowChat?: boolean;
 
   modelTagsPath?: string;
-  routerRulesPath?: string;
   modelPriorityPath?: string;
   keywordLibraryPath?: string;
   keywordOverridesPath?: string;
@@ -111,7 +104,6 @@ const DEFAULTS = {
   switchingAllowChat: false,
 
   get modelTagsPath() { return path.join(getDefaultToolsDir(), "model-tags.json"); },
-  get routerRulesPath() { return path.join(getDefaultToolsDir(), "router-rules.json"); },
   get modelPriorityPath() { return path.join(getDefaultToolsDir(), "model-priority.json"); },
   get keywordLibraryPath() { return path.join(getDefaultToolsDir(), "keyword-library.json"); },
   get keywordOverridesPath() { return path.join(getDefaultToolsDir(), "keyword-overrides.user.json"); },
@@ -209,10 +201,6 @@ function resolveConfig(api: OpenClawPluginApi): Required<typeof DEFAULTS> {
     typeof cfg.modelTagsPath === "string" && cfg.modelTagsPath.trim()
       ? cfg.modelTagsPath
       : DEFAULTS.modelTagsPath;
-  const routerRulesPath =
-    typeof cfg.routerRulesPath === "string" && cfg.routerRulesPath.trim()
-      ? cfg.routerRulesPath
-      : DEFAULTS.routerRulesPath;
   const modelPriorityPath =
     typeof cfg.modelPriorityPath === "string" && cfg.modelPriorityPath.trim()
       ? cfg.modelPriorityPath
@@ -271,7 +259,6 @@ function resolveConfig(api: OpenClawPluginApi): Required<typeof DEFAULTS> {
     switchingMinConfidence,
     switchingAllowChat,
     modelTagsPath,
-    routerRulesPath,
     modelPriorityPath,
     keywordLibraryPath,
     keywordOverridesPath,
@@ -389,7 +376,7 @@ let catalogRefreshInFlight: Promise<ModelCatalog> | null = null;
 let lastSetupPromptAtMs = 0;
 
 // Classification config cache
-let classificationConfig: ClassificationRulesConfig | null = null;
+// legacy classification config removed
 
 function inferTagsFromCatalog(entry: ModelCatalogEntry): string[] {
   const tags: string[] = [];
@@ -519,7 +506,7 @@ function pickByPriority(params: {
   kind: string;
   catalog: ModelCatalog;
   priorityFile: ModelPriorityFile | null;
-  classificationConfig?: ClassificationRulesConfig | null;
+  // classificationConfig removed (keyword-library only)
   providerAuth: Record<string, "ok" | "expired" | "unknown">;
 }): { picked?: string; note: string } {
   const { kind, catalog, priorityFile, classificationConfig, providerAuth } = params;
@@ -794,40 +781,13 @@ async function getAuthSnapshot(params: {
   }
 }
 
-async function getClassificationConfig(): Promise<ClassificationRulesConfig> {
-  if (classificationConfig) {
-    return classificationConfig;
-  }
-
-  try {
-    const configPath = path.join(getDefaultToolsDir(), "classification-rules.json");
-    classificationConfig = await loadClassificationRules(configPath);
-    return classificationConfig;
-  } catch (err) {
-    // Fallback: return minimal config with just fallback category
-    return {
-      version: 1,
-      categories: [
-        {
-          id: "fallback",
-          name: "Fallback",
-          priority: 0,
-          enabled: true,
-          rules: {},
-          confidence: {},
-          models: ["google-antigravity/claude-sonnet-4-5-thinking"],
-        },
-      ],
-    };
-  }
-}
+// Legacy classification config loader removed (fully converged to keyword-library routing).
 
 /**
  * Classification (async)
  *
- * Preference order:
- * 1) Weighted keyword library (keyword-library.json + optional keyword-overrides.user.json)
- * 2) Legacy classification-rules.json (kept for backward compatibility)
+ * Fully converged routing:
+ * - Weighted keyword library only (keyword-library.json + optional keyword-overrides.user.json)
  */
 async function classifyDynamic(
   api: OpenClawPluginApi,
@@ -855,7 +815,7 @@ async function classifyDynamic(
 
         // Per requirement: do NOT switch models lightly. Keep execution on gpt-5.2 by default.
         // The router still computes kind/confidence/explanations; model switching (if ever) is handled separately.
-        const model = "openai-codex/gpt-5.2";
+        const model = "local-proxy/gpt-5.2";
 
         const signals = [
           "weighted_keyword_library",
@@ -870,26 +830,30 @@ async function classifyDynamic(
           signals,
           confidence: decision.confidence,
         };
-      } catch {
-        // fall through to legacy classifier
+      } catch (err) {
+        // Fully converged: do not fall back to legacy classifier.
+        return {
+          kind: "fallback",
+          model: "local-proxy/gpt-5.2",
+          reason: `Keyword-library classification error: ${err instanceof Error ? err.message : String(err)}`,
+          signals: ["error_fallback", "weighted_keyword_library"],
+          confidence: "low",
+        };
       }
     }
 
-    // Legacy: classification-rules.json
-    const config = await getClassificationConfig();
-    const result = classifyContent(content, metadata, config);
-
+    // Fully converged: keyword routing is required; if disabled, we still do not load legacy rules.
     return {
-      kind: result.categoryId,
-      model: "openai-codex/gpt-5.2",
-      reason: result.reason,
-      signals: result.signals,
-      confidence: result.confidence,
+      kind: "fallback",
+      model: "local-proxy/gpt-5.2",
+      reason: "Keyword-library routing disabled (keywordCustomEnabled=false); using fallback.",
+      signals: ["fallback:keyword_routing_disabled"],
+      confidence: "low",
     };
   } catch (err) {
     return {
       kind: "fallback",
-      model: "openai-codex/gpt-5.2",
+      model: "local-proxy/gpt-5.2",
       reason: `Classification error: ${err instanceof Error ? err.message : String(err)}`,
       signals: ["error_fallback"],
       confidence: "low",
@@ -899,7 +863,7 @@ async function classifyDynamic(
 
 function pickFallbackModel(kind: Suggestion["kind"]) {
   // Keep it simple and reliable: always use gpt-5.2 as the hard fallback.
-  return "openai-codex/gpt-5.2";
+  return "local-proxy/gpt-5.2";
 }
 
 async function computeAvailability(params: {
@@ -944,7 +908,7 @@ async function computeAvailability(params: {
   if (provider === "openai-codex") {
     status = "ok";
   }
-  if (provider === "qwen-portal" || provider === "google-antigravity") {
+  if (provider === "qwen-portal") {
     note = `Provider "${provider}" may require valid auth; availability not probed (static mode).`;
   }
 
@@ -983,7 +947,7 @@ type FallbackSuggestion = {
 };
 
 type Suggestion = {
-  kind: string; // Dynamic - loaded from classification-rules.json
+  kind: string; // 9 kinds from keyword-library.json
   model: string;
   reason: string;
   signals: string[];
@@ -1139,7 +1103,7 @@ export default function register(api: OpenClawPluginApi) {
         if (confRank(suggestion.confidence) < confRank(cfg.switchingMinConfidence)) return;
         if (!cfg.switchingAllowChat && (suggestion.kind === "quick_simple" || suggestion.kind === "fallback")) return;
 
-        const classificationCfg = await getClassificationConfig();
+        // Fully converged: do not load legacy classification config.
         const priorityFile = await loadJsonFile<ModelPriorityFile>(cfg.modelPriorityPath);
         const catalog = await getModelCatalog(api, cfg);
         const providerAuth = buildProviderAuthMapFromSnapshot(authCache?.value ?? null);
@@ -1148,7 +1112,7 @@ export default function register(api: OpenClawPluginApi) {
           kind: suggestion.kind,
           catalog,
           priorityFile,
-          classificationConfig: classificationCfg,
+          classificationConfig: null,
           providerAuth,
         });
 
@@ -1223,7 +1187,7 @@ export default function register(api: OpenClawPluginApi) {
         if (cfg.ruleEngineEnabled) {
           try {
             const tagsFile = await loadJsonFile<ModelTagsFile>(cfg.modelTagsPath);
-            const classificationCfg = await getClassificationConfig();
+            // Fully converged: do not load legacy classification config.
             const priorityFile = await loadJsonFile<ModelPriorityFile>(cfg.modelPriorityPath);
             const catalog = await getModelCatalog(api, cfg);
 
@@ -1234,7 +1198,7 @@ export default function register(api: OpenClawPluginApi) {
               kind: suggestion.kind,
               catalog,
               priorityFile,
-              classificationConfig: classificationCfg,
+              classificationConfig: null,
               providerAuth,
             });
 

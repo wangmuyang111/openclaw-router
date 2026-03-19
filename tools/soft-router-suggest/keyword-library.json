@@ -921,7 +921,7 @@
       "models": {
         "strategy": "priority_list",
         "list": [
-          "openai-codex/gpt-5.2"
+          "local-proxy/gpt-5.2"
         ]
       }
     },
@@ -969,7 +969,7 @@
       "models": {
         "strategy": "priority_list",
         "list": [
-          "openai-codex/gpt-5.2"
+          "local-proxy/gpt-5.2"
         ]
       }
     },
@@ -1005,7 +1005,7 @@
       "models": {
         "strategy": "priority_list",
         "list": [
-          "openai-codex/gpt-5.2"
+          "local-proxy/gpt-5.2"
         ]
       }
     },
@@ -1034,7 +1034,7 @@
       "models": {
         "strategy": "priority_list",
         "list": [
-          "openai-codex/gpt-5.2"
+          "local-proxy/gpt-5.2"
         ]
       }
     },
@@ -1075,7 +1075,7 @@
       "models": {
         "strategy": "priority_list",
         "list": [
-          "openai-codex/gpt-5.2"
+          "local-proxy/gpt-5.2"
         ]
       }
     },
@@ -1104,7 +1104,7 @@
       "models": {
         "strategy": "priority_list",
         "list": [
-          "openai-codex/gpt-5.2"
+          "local-proxy/gpt-5.2"
         ]
       }
     },
@@ -1138,7 +1138,7 @@
       "models": {
         "strategy": "priority_list",
         "list": [
-          "openai-codex/gpt-5.2"
+          "local-proxy/gpt-5.2"
         ]
       }
     },
@@ -1174,7 +1174,7 @@
       "models": {
         "strategy": "priority_list",
         "list": [
-          "openai-codex/gpt-5.2"
+          "local-proxy/gpt-5.2"
         ]
       }
     },
@@ -1203,7 +1203,7 @@
       "models": {
         "strategy": "priority_list",
         "list": [
-          "openai-codex/gpt-5.2"
+          "local-proxy/gpt-5.2"
         ]
       }
     }
