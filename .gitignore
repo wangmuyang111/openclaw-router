@@ -6,3 +6,6 @@ dist/
 /tmp_openclaw.json
 /tmp_openclaw.json.*
 /tmp/
+
+# Generated caches
+/tools/soft-router-suggest/model-catalog.cache.json
