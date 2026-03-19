@@ -1,21 +1,8 @@
-# Runtime / local
-*.log
-*.jsonl
-logs/
-backups/
-
-# OpenClaw local config/state
-openclaw.json
-*.bak.*
-*.bak
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Node
+# Node / build
 node_modules/
+dist/
 
-# Editor
-.vscode/
-.idea/
+# Local debug artifacts
+/tmp_openclaw.json
+/tmp_openclaw.json.*
+/tmp/
