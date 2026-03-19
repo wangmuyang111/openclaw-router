@@ -63,6 +63,18 @@ function Read-LineOrEsc(
   }
 }
 
+function Wait-AnyKeyOrEsc([string]$message = '按任意键返回（ESC 也可以）') {
+  # Without this, the next menu loop clears the screen and hides the output.
+  Write-Host
+  Write-Host $message -ForegroundColor DarkGray
+  try {
+    [void][Console]::ReadKey($true)
+  } catch {
+    # Fallback for non-console host
+    [void](Read-Host)
+  }
+}
+
 function Read-ChoiceOrEsc([string]$prompt) {
   return Read-LineOrEsc -prompt ("$prompt (ESC=Back): ")
 }
@@ -116,8 +128,8 @@ function Run-Catalog {
   Write-Host "(Tip: press ESC to go back)" -ForegroundColor DarkGray
   $c = Read-ChoiceOrEsc 'Choose (1-3)'
   if ($null -eq $c) { return }
-  if ($c -eq '1') { & $catalogScript | Out-Host }
-  elseif ($c -eq '2') { & $catalogScript -Refresh | Out-Host }
+  if ($c -eq '1') { & $catalogScript | Out-Host; Wait-AnyKeyOrEsc }
+  elseif ($c -eq '2') { & $catalogScript -Refresh | Out-Host; Wait-AnyKeyOrEsc }
 }
 
 function Get-KindModelList([string]$kind) {
@@ -431,11 +443,12 @@ while ($true) {
       '2' { Run-Models }
       '3' { Run-Keywords }
       '4' { Run-Preview }
-      '5' { Show-CurrentKindModels }
+      '5' { Show-CurrentKindModels; Wait-AnyKeyOrEsc }
       '0' { break }
-      default { Write-Host 'Invalid choice' -ForegroundColor Yellow }
+      default { Write-Host 'Invalid choice' -ForegroundColor Yellow; Wait-AnyKeyOrEsc }
     }
   } catch {
     Write-Host ("ERROR: " + $_.Exception.Message) -ForegroundColor Red
+    Wait-AnyKeyOrEsc
   }
 }
