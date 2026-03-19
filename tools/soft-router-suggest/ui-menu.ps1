@@ -22,6 +22,54 @@ function Safe-Clear {
   try { Clear-Host } catch { }
 }
 
+function Read-LineOrEsc(
+  [string]$prompt,
+  [switch]$AllowEmpty
+) {
+  # Returns string, or $null if user pressed ESC.
+  # Fallback: if console key reading is unavailable, user can type "esc".
+  Write-Host -NoNewline $prompt
+
+  try {
+    $buf = ""
+    while ($true) {
+      $k = [Console]::ReadKey($true)
+      if ($k.Key -eq 'Escape') {
+        Write-Host
+        return $null
+      }
+      if ($k.Key -eq 'Enter') {
+        Write-Host
+        if (-not $AllowEmpty -and [string]::IsNullOrWhiteSpace($buf)) { continue }
+        return $buf
+      }
+      if ($k.Key -eq 'Backspace') {
+        if ($buf.Length -gt 0) {
+          $buf = $buf.Substring(0, $buf.Length - 1)
+          # Erase one char on screen
+          Write-Host -NoNewline "`b `b"
+        }
+        continue
+      }
+
+      $ch = $k.KeyChar
+      if ($ch -eq [char]0) { continue }
+      $buf += $ch
+      Write-Host -NoNewline $ch
+    }
+  } catch {
+    # Non-console host fallback
+    $s = Read-Host
+    if ($s -match '^(esc|ESC)$') { return $null }
+    if (-not $AllowEmpty -and [string]::IsNullOrWhiteSpace($s)) { return "" }
+    return $s
+  }
+}
+
+function Read-ChoiceOrEsc([string]$prompt) {
+  return Read-LineOrEsc -prompt ("$prompt (ESC=Back): ")
+}
+
 function Read-MultiLine([string]$prompt, [string]$terminator = 'END') {
   Write-Host $prompt -ForegroundColor Cyan
   Write-Host "Paste text now. Finish with a single line: $terminator" -ForegroundColor DarkGray
@@ -68,7 +116,9 @@ function Run-Catalog {
   Write-Host "1) View (use cache if fresh)" 
   Write-Host "2) Refresh now" 
   Write-Host "3) Back" 
-  $c = Read-Host 'Choose (1-3)'
+  Write-Host "(Tip: press ESC to go back)" -ForegroundColor DarkGray
+  $c = Read-ChoiceOrEsc 'Choose (1-3)'
+  if ($null -eq $c) { return }
   if ($c -eq '1') { & $catalogScript | Out-Host }
   elseif ($c -eq '2') { & $catalogScript -Refresh | Out-Host }
 }
@@ -117,7 +167,9 @@ function Reorder-Menu([string]$kind, [string]$kindModelsScript) {
     Write-Host "1) Move (by number)" 
     Write-Host "2) Pin to TOP (by number)" 
     Write-Host "0) Done" 
-    $c = Read-Host 'Choose (0-2)'
+    Write-Host "(Tip: press ESC to go back)" -ForegroundColor DarkGray
+    $c = Read-ChoiceOrEsc 'Choose (0-2)'
+    if ($null -eq $c) { break }
     if ($c -eq '0') { break }
 
     if ($list.Count -eq 0) {
@@ -170,8 +222,9 @@ function Run-Models {
     }
     Write-Host "0) Back"
 
-    $pick = Read-Host ("Choose (0-{0})" -f $kinds.Count)
-    if ($pick -eq '0') { break }
+    Write-Host "(Tip: press ESC to go back)" -ForegroundColor DarkGray
+    $pick = Read-ChoiceOrEsc ("Choose (0-{0})" -f $kinds.Count)
+    if ($null -eq $pick -or $pick -eq '0') { break }
 
     $idx = -1
     if (-not [int]::TryParse($pick, [ref]$idx)) { continue }
@@ -189,8 +242,9 @@ function Run-Models {
       Write-Host "3) Remove model (pick by number)"
       Write-Host "0) Back"
 
-      $c = Read-Host 'Choose (0-3)'
-      if ($c -eq '0') { break }
+      Write-Host "(Tip: press ESC to go back)" -ForegroundColor DarkGray
+      $c = Read-ChoiceOrEsc 'Choose (0-3)'
+      if ($null -eq $c -or $c -eq '0') { break }
 
       try {
         switch ($c) {
@@ -372,7 +426,9 @@ while ($true) {
   Write-Host "5) Show current kind -> models"
   Write-Host "0) Exit"
 
-  $choice = Read-Host 'Choose (0-5)'
+  Write-Host "(Tip: press ESC to go back)" -ForegroundColor DarkGray
+  $choice = Read-ChoiceOrEsc 'Choose (0-5)'
+  if ($null -eq $choice) { continue }
   try {
     switch ($choice) {
       '1' { Run-Catalog; Pause-Any }
