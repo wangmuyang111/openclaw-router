@@ -427,16 +427,15 @@ while ($true) {
   if ($null -eq $choice) { continue }
   try {
     switch ($choice) {
-      '1' { Run-Catalog; Pause-Any }
-      '2' { Run-Models; Pause-Any }
-      '3' { Run-Keywords; Pause-Any }
-      '4' { Run-Preview; Pause-Any }
-      '5' { Show-CurrentKindModels; Pause-Any }
+      '1' { Run-Catalog }
+      '2' { Run-Models }
+      '3' { Run-Keywords }
+      '4' { Run-Preview }
+      '5' { Show-CurrentKindModels }
       '0' { break }
-      default { Write-Host 'Invalid choice' -ForegroundColor Yellow; Pause-Any }
+      default { Write-Host 'Invalid choice' -ForegroundColor Yellow }
     }
   } catch {
     Write-Host ("ERROR: " + $_.Exception.Message) -ForegroundColor Red
-    Pause-Any
   }
 }
