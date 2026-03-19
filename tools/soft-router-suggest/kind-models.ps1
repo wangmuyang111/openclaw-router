@@ -37,6 +37,9 @@ function Ensure-Kind($lib, $kind) {
   if ($kinds -notcontains $kind) {
     throw "Unknown kind '$kind'. Available: $($kinds -join ', ')"
   }
+  if ($kind -eq 'chat') {
+    throw "Kind 'chat' is fallback-reserved; manage other kinds here." 
+  }
 }
 
 function Get-ModelList($lib, $kind) {

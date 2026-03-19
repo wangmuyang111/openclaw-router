@@ -432,10 +432,11 @@ while ($true) {
   Write-Host "3) Keywords add/remove (paste-only overrides)"
   Write-Host "4) Route preview (local scoring; no LLM)"
   Write-Host "5) Show current kind -> models"
+  Write-Host "6) Add kind (new top-level kind; higher than fallback)"
   Write-Host "0) Exit"
 
   Write-Host "(Tip: press ESC to go back)" -ForegroundColor DarkGray
-  $choice = Read-ChoiceOrEsc 'Choose (0-5)'
+  $choice = Read-ChoiceOrEsc 'Choose (0-6)'
   if ($null -eq $choice) { continue }
   try {
     switch ($choice) {
@@ -444,6 +445,16 @@ while ($true) {
       '3' { Run-Keywords }
       '4' { Run-Preview }
       '5' { Show-CurrentKindModels; Wait-AnyKeyOrEsc }
+      '6' {
+        $addKind = Join-Path $toolsDir 'add-kind.ps1'
+        Write-Host "New kind id format: lowercase letters/digits/underscore, start with a letter (e.g. finance_ai)." -ForegroundColor DarkGray
+        $kid = Read-ChoiceOrEsc 'Enter new kind id'
+        if ($null -ne $kid -and $kid -ne '') {
+          & $addKind -Kind $kid | Out-Host
+          Write-Host "Added kind. Next: configure keywords (menu 3) and model priority (menu 2)." -ForegroundColor Green
+          Wait-AnyKeyOrEsc
+        }
+      }
       '0' { break }
       default { Write-Host 'Invalid choice' -ForegroundColor Yellow; Wait-AnyKeyOrEsc }
     }
