@@ -87,7 +87,12 @@ switch ($Command) {
   'enable' {
     Assert-KindExists $lib $Kind
     Assert-NotReserved $Kind
-    $lib.kinds.$Kind.enabled = $true
+    $kr = $lib.kinds.$Kind
+    if ($kr.PSObject.Properties.Name -contains 'enabled') {
+      $kr.enabled = $true
+    } else {
+      $kr | Add-Member -NotePropertyName enabled -NotePropertyValue $true -Force
+    }
     Save-Json $LibraryPath $lib
     Write-Output "OK"
   }
@@ -95,7 +100,12 @@ switch ($Command) {
   'disable' {
     Assert-KindExists $lib $Kind
     Assert-NotReserved $Kind
-    $lib.kinds.$Kind.enabled = $false
+    $kr = $lib.kinds.$Kind
+    if ($kr.PSObject.Properties.Name -contains 'enabled') {
+      $kr.enabled = $false
+    } else {
+      $kr | Add-Member -NotePropertyName enabled -NotePropertyValue $false -Force
+    }
     Save-Json $LibraryPath $lib
     Write-Output "OK"
   }
