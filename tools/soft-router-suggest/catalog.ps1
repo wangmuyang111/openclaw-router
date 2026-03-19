@@ -39,6 +39,38 @@ function Fetch-Catalog {
     models = $data
   }
   ($out | ConvertTo-Json -Depth 50) | Set-Content -Path $CachePath -Encoding UTF8
+
+  # Print a readable summary (stdout) in addition to the raw JSON below.
+  try {
+    $ms = $data.models
+    $avail = @($ms | Where-Object { $_.available -eq $true })
+    $unavail = @($ms | Where-Object { $_.available -ne $true })
+
+    Write-Host "" 
+    Write-Host ("Catalog summary: total={0} available={1} unavailable={2}" -f $data.count, $avail.Count, $unavail.Count) -ForegroundColor Cyan
+
+    $groups = $avail | Group-Object input | Sort-Object Name
+    foreach ($g in $groups) {
+      Write-Host ("AVAILABLE input={0} ({1})" -f $g.Name, $g.Count) -ForegroundColor Green
+      foreach ($m in ($g.Group | Sort-Object key)) {
+        $tags = if ($m.tags) { ($m.tags -join ' ') } else { '' }
+        Write-Host ("- {0}  ctx={1}  tags=[{2}]" -f $m.key, $m.contextWindow, $tags)
+      }
+      Write-Host ""
+    }
+
+    if ($unavail.Count -gt 0) {
+      Write-Host ("UNAVAILABLE ({0})" -f $unavail.Count) -ForegroundColor Yellow
+      foreach ($m in ($unavail | Sort-Object key)) {
+        $tags = if ($m.tags) { ($m.tags -join ' ') } else { '' }
+        Write-Host ("- {0}  available={1}  tags=[{2}]" -f $m.key, $m.available, $tags)
+      }
+      Write-Host ""
+    }
+  } catch {
+    # ignore summary errors
+  }
+
   return $out
 }
 
