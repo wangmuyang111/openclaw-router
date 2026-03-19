@@ -1,0 +1,781 @@
+{
+  "agents": {
+    "defaults": {
+      "compaction": {
+        "mode": "safeguard"
+      },
+      "maxConcurrent": 4,
+      "model": {
+        "fallbacks": [
+          "local-proxy/gemini-3-pro-high",
+          "local-proxy/gemini-3.1-pro-preview",
+          "local-proxy/gpt-5.1"
+        ],
+        "primary": "local-proxy/gpt-5.2"
+      },
+      "models": {
+        "local-proxy/claude-opus-4-6-thinking": {
+          "alias": "opus-4-6-thinking"
+        },
+        "local-proxy/claude-sonnet-4-6": {
+          "alias": "sonnet-4-6"
+        },
+        "local-proxy/coder-model": {
+          "alias": "coder-model"
+        },
+        "local-proxy/gemini-2.5-flash": {
+          "alias": "2.5-flash"
+        },
+        "local-proxy/gemini-2.5-flash-lite": {
+          "alias": "2.5-flash-lite"
+        },
+        "local-proxy/gemini-2.5-pro": {
+          "alias": "2.5-pro"
+        },
+        "local-proxy/gemini-3-flash": {
+          "alias": "3-flash"
+        },
+        "local-proxy/gemini-3-flash-preview": {
+          "alias": "3-flash"
+        },
+        "local-proxy/gemini-3-pro-high": {
+          "alias": "3-pro-high"
+        },
+        "local-proxy/gemini-3-pro-low": {
+          "alias": "3-pro-low"
+        },
+        "local-proxy/gemini-3-pro-preview": {
+          "alias": "3-pro"
+        },
+        "local-proxy/gemini-3.1-flash-image": {
+          "alias": "3.1-flash-image"
+        },
+        "local-proxy/gemini-3.1-flash-lite-preview": {
+          "alias": "3.1-flash-lite"
+        },
+        "local-proxy/gemini-3.1-pro-high": {
+          "alias": "3.1-pro-high"
+        },
+        "local-proxy/gemini-3.1-pro-low": {
+          "alias": "3.1-pro-low"
+        },
+        "local-proxy/gemini-3.1-pro-preview": {
+          "alias": "3.1-pro"
+        },
+        "local-proxy/gpt-5": {
+          "alias": "5"
+        },
+        "local-proxy/gpt-5-codex": {
+          "alias": "5-codex"
+        },
+        "local-proxy/gpt-5-codex-mini": {
+          "alias": "5-codex-mini"
+        },
+        "local-proxy/gpt-5.1": {
+          "alias": "5.1"
+        },
+        "local-proxy/gpt-5.1-codex": {
+          "alias": "5.1-codex"
+        },
+        "local-proxy/gpt-5.1-codex-max": {
+          "alias": "5.1-codex-max"
+        },
+        "local-proxy/gpt-5.1-codex-mini": {
+          "alias": "5.1-codex-mini"
+        },
+        "local-proxy/gpt-5.2": {
+          "alias": "5.2"
+        },
+        "local-proxy/gpt-5.2-codex": {
+          "alias": "5.2-codex"
+        },
+        "local-proxy/gpt-oss-120b-medium": {
+          "alias": "oss-120b-medium"
+        },
+        "local-proxy/qwen3-coder-flash": {
+          "alias": "qwen3-coder-flash"
+        },
+        "local-proxy/qwen3-coder-plus": {
+          "alias": "qwen3-coder-plus"
+        },
+        "local-proxy/vision-model": {
+          "alias": "vision-model"
+        },
+        "qwen-portal/coder-model": {
+          "alias": "qwen"
+        },
+        "qwen-portal/vision-model": {}
+      },
+      "subagents": {
+        "maxConcurrent": 8
+      },
+      "workspace": "C:\\Users\\muyang\\.openclaw\\workspace"
+    }
+  },
+  "auth": {
+    "profiles": {
+      "qwen-portal:default": {
+        "mode": "oauth",
+        "provider": "qwen-portal"
+      }
+    }
+  },
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto",
+    "ownerDisplay": "raw",
+    "restart": true
+  },
+  "gateway": {
+    "auth": {
+      "mode": "token",
+      "token": "f611f536450ee72d8995cbc75d1b190252be59ad89e2febd"
+    },
+    "bind": "loopback",
+    "mode": "local",
+    "nodes": {
+      "denyCommands": [
+        "camera.snap",
+        "camera.clip",
+        "screen.record",
+        "contacts.add",
+        "calendar.add",
+        "reminders.add",
+        "sms.send"
+      ]
+    },
+    "port": 18789,
+    "tailscale": {
+      "mode": "off",
+      "resetOnExit": false
+    }
+  },
+  "messages": {
+    "ackReactionScope": "group-mentions"
+  },
+  "meta": {
+    "lastTouchedAt": "2026-03-18T15:06:08.119Z",
+    "lastTouchedVersion": "2026.3.3"
+  },
+  "models": {
+    "providers": {
+      "local-proxy": {
+        "api": "openai-completions",
+        "apiKey": "yo-k9p2m5n8x3x6z9p2w4r7t5y1u0i5o7p9",
+        "baseUrl": "http://127.0.0.1:8317/v1",
+        "models": [
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "qwen3-coder-flash",
+            "input": [
+              "text"
+            ],
+            "maxTokens": 8192,
+            "name": "qwen3-coder-flash",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "gemini-3-pro-high",
+            "input": [
+              "text"
+            ],
+            "maxTokens": 8192,
+            "name": "gemini-3-pro-high",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "gemini-3.1-pro-preview",
+            "input": [
+              "text"
+            ],
+            "maxTokens": 8192,
+            "name": "gemini-3.1-pro-preview",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "gpt-5.1",
+            "input": [
+              "text",
+              "image"
+            ],
+            "maxTokens": 8192,
+            "name": "gpt-5.1",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "gpt-5.2",
+            "input": [
+              "text",
+              "image"
+            ],
+            "maxTokens": 8192,
+            "name": "gpt-5.2",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "gpt-5-codex",
+            "input": [
+              "text",
+              "image"
+            ],
+            "maxTokens": 8192,
+            "name": "gpt-5-codex",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "gpt-oss-120b-medium",
+            "input": [
+              "text"
+            ],
+            "maxTokens": 8192,
+            "name": "gpt-oss-120b-medium",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "gemini-3-flash-preview",
+            "input": [
+              "text"
+            ],
+            "maxTokens": 8192,
+            "name": "gemini-3-flash-preview",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "gpt-5.1-codex",
+            "input": [
+              "text",
+              "image"
+            ],
+            "maxTokens": 8192,
+            "name": "gpt-5.1-codex",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "gpt-5.1-codex-mini",
+            "input": [
+              "text",
+              "image"
+            ],
+            "maxTokens": 8192,
+            "name": "gpt-5.1-codex-mini",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "vision-model",
+            "input": [
+              "text",
+              "image"
+            ],
+            "maxTokens": 8192,
+            "name": "vision-model",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "gemini-3.1-pro-low",
+            "input": [
+              "text"
+            ],
+            "maxTokens": 8192,
+            "name": "gemini-3.1-pro-low",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "gemini-2.5-flash",
+            "input": [
+              "text"
+            ],
+            "maxTokens": 8192,
+            "name": "gemini-2.5-flash",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "gpt-5-codex-mini",
+            "input": [
+              "text",
+              "image"
+            ],
+            "maxTokens": 8192,
+            "name": "gpt-5-codex-mini",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "coder-model",
+            "input": [
+              "text"
+            ],
+            "maxTokens": 8192,
+            "name": "coder-model",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "gemini-3-pro-preview",
+            "input": [
+              "text"
+            ],
+            "maxTokens": 8192,
+            "name": "gemini-3-pro-preview",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "gpt-5.1-codex-max",
+            "input": [
+              "text",
+              "image"
+            ],
+            "maxTokens": 8192,
+            "name": "gpt-5.1-codex-max",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "claude-sonnet-4-6",
+            "input": [
+              "text"
+            ],
+            "maxTokens": 8192,
+            "name": "claude-sonnet-4-6",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "claude-opus-4-6-thinking",
+            "input": [
+              "text"
+            ],
+            "maxTokens": 8192,
+            "name": "claude-opus-4-6-thinking",
+            "reasoning": true
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "gemini-3.1-flash-image",
+            "input": [
+              "text",
+              "image"
+            ],
+            "maxTokens": 8192,
+            "name": "gemini-3.1-flash-image",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "gemini-3.1-flash-lite-preview",
+            "input": [
+              "text"
+            ],
+            "maxTokens": 8192,
+            "name": "gemini-3.1-flash-lite-preview",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "qwen3-coder-plus",
+            "input": [
+              "text"
+            ],
+            "maxTokens": 8192,
+            "name": "qwen3-coder-plus",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "gemini-3-flash",
+            "input": [
+              "text"
+            ],
+            "maxTokens": 8192,
+            "name": "gemini-3-flash",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "gemini-2.5-flash-lite",
+            "input": [
+              "text"
+            ],
+            "maxTokens": 8192,
+            "name": "gemini-2.5-flash-lite",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "gpt-5.3-codex",
+            "input": [
+              "text",
+              "image"
+            ],
+            "maxTokens": 8192,
+            "name": "gpt-5.3-codex",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "gpt-5.3-codex-spark",
+            "input": [
+              "text",
+              "image"
+            ],
+            "maxTokens": 8192,
+            "name": "gpt-5.3-codex-spark",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "gpt-5.4",
+            "input": [
+              "text",
+              "image"
+            ],
+            "maxTokens": 8192,
+            "name": "gpt-5.4",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "gemini-3-pro-low",
+            "input": [
+              "text"
+            ],
+            "maxTokens": 8192,
+            "name": "gemini-3-pro-low",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "gemini-3.1-pro-high",
+            "input": [
+              "text"
+            ],
+            "maxTokens": 8192,
+            "name": "gemini-3.1-pro-high",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "gemini-2.5-pro",
+            "input": [
+              "text"
+            ],
+            "maxTokens": 8192,
+            "name": "gemini-2.5-pro",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "gpt-5",
+            "input": [
+              "text",
+              "image"
+            ],
+            "maxTokens": 8192,
+            "name": "gpt-5",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "gpt-5.2-codex",
+            "input": [
+              "text",
+              "image"
+            ],
+            "maxTokens": 8192,
+            "name": "gpt-5.2-codex",
+            "reasoning": false
+          }
+        ]
+      },
+      "qwen-portal": {
+        "api": "openai-completions",
+        "apiKey": "qwen-oauth",
+        "baseUrl": "https://portal.qwen.ai/v1",
+        "models": [
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "coder-model",
+            "input": [
+              "text"
+            ],
+            "maxTokens": 8192,
+            "name": "Qwen Coder",
+            "reasoning": false
+          },
+          {
+            "contextWindow": 128000,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0
+            },
+            "id": "vision-model",
+            "input": [
+              "text",
+              "image"
+            ],
+            "maxTokens": 8192,
+            "name": "Qwen Vision",
+            "reasoning": false
+          }
+        ]
+      }
+    }
+  },
+  "plugins": {
+    "allow": [
+      "soft-router-suggest",
+      "qwen-portal-auth"
+    ],
+    "entries": {
+      "qwen-portal-auth": {
+        "enabled": true
+      },
+      "soft-router-suggest": {
+        "config": {
+          "enabled": false,
+          "openclawCliPath": "openclaw",
+          "routerLlmEnabled": false,
+          "ruleEngineEnabled": true,
+          "switchingAllowChat": false,
+          "switchingEnabled": true
+        },
+        "enabled": false
+      },
+      "telegram": {
+        "enabled": true
+      }
+    },
+    "installs": {
+      "soft-router-suggest": {
+        "installPath": "C:\\Users\\muyang\\.openclaw\\workspace\\.openclaw\\extensions\\soft-router-suggest",
+        "source": "path",
+        "sourcePath": "C:\\Users\\muyang\\.openclaw\\workspace\\.openclaw\\extensions\\soft-router-suggest"
+      }
+    }
+  },
+  "session": {
+    "dmScope": "per-channel-peer"
+  },
+  "tools": {
+    "profile": "full"
+  },
+  "wizard": {
+    "lastRunAt": "2026-03-08T04:33:49.419Z",
+    "lastRunCommand": "configure",
+    "lastRunMode": "local",
+    "lastRunVersion": "2026.3.3"
+  }
+}
