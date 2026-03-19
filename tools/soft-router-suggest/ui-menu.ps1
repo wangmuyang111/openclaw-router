@@ -80,11 +80,14 @@ function Read-ChoiceOrEsc([string]$prompt) {
 }
 
 function Read-MultiLine([string]$prompt, [string]$terminator = 'END') {
+  # Returns string, or $null if user pressed ESC / typed "esc".
   Write-Host $prompt -ForegroundColor Cyan
-  Write-Host "Paste text now. Finish with a single line: $terminator" -ForegroundColor DarkGray
+  Write-Host "Paste text now. Finish with a single line: $terminator  (ESC=Back)" -ForegroundColor DarkGray
   $lines = New-Object System.Collections.Generic.List[string]
   while ($true) {
-    $line = Read-Host
+    $line = Read-LineOrEsc -prompt '' -AllowEmpty
+    if ($null -eq $line) { return $null }
+    if ($line -match '^(esc|ESC)$') { return $null }
     if ($line -eq $terminator) { break }
     $lines.Add($line)
   }
@@ -405,12 +408,15 @@ function Run-Keywords {
 function Run-Preview {
   Write-Host "=== Route Preview (NO LLM calls) ===" -ForegroundColor Cyan
   $text = Read-MultiLine -prompt 'Paste test text to classify (END to finish):'
-  $hasImage = Read-Host 'HasImage? (y/N)'
+  if ($null -eq $text) { return }
+  $hasImage = Read-ChoiceOrEsc 'HasImage? (y/N)'
+  if ($null -eq $hasImage) { return }
   if ($hasImage -match '^(y|Y)') {
     & $previewScript -Text $text -HasImage | Out-Host
   } else {
     & $previewScript -Text $text | Out-Host
   }
+  Wait-AnyKeyOrEsc
 }
 
 if ($Mode -ne 'menu') {
