@@ -462,38 +462,70 @@ while ($true) {
       '4' { Run-Keywords }
       '5' {
         $admin = Join-Path $toolsDir 'kind-admin.ps1'
-        Write-Host "Kind admin:" -ForegroundColor Cyan
-        Write-Host "1) List kinds" 
-        Write-Host "2) Disable kind" 
-        Write-Host "3) Enable kind" 
-        Write-Host "4) Delete kind (removes kind + keywordSets + overrides)" 
-        Write-Host "0) Back" 
-        Write-Host "(ESC also goes back)" -ForegroundColor DarkGray
-        $c = Read-ChoiceOrEsc 'Choose (0-4)'
-        if ($null -eq $c -or $c -eq '0') { continue }
 
-        switch ($c) {
-          '1' { & $admin list | Out-Host; Wait-AnyKeyOrEsc }
-          '2' {
-            $k = Read-ChoiceOrEsc 'Kind to disable'
-            if ($null -eq $k -or $k -eq '') { break }
-            & $admin disable -Kind $k | Out-Host
-            Wait-AnyKeyOrEsc
-          }
-          '3' {
-            $k = Read-ChoiceOrEsc 'Kind to enable'
-            if ($null -eq $k -or $k -eq '') { break }
-            & $admin enable -Kind $k | Out-Host
-            Wait-AnyKeyOrEsc
-          }
-          '4' {
-            $k = Read-ChoiceOrEsc 'Kind to DELETE'
-            if ($null -eq $k -or $k -eq '') { break }
-            Write-Host "Type DELETE to confirm:" -ForegroundColor Yellow
-            $confirm = Read-ChoiceOrEsc 'Confirm'
-            if ($confirm -ne 'DELETE') { Write-Host 'Canceled.' -ForegroundColor DarkGray; Wait-AnyKeyOrEsc; break }
-            & $admin delete -Kind $k -Force | Out-Host
-            Wait-AnyKeyOrEsc
+        function Get-AdminKinds {
+          # Use the same list source as admin script (keyword-library.json), via our in-memory loader.
+          # Keep ordering stable for selection.
+          return @(List-Kinds)
+        }
+
+        function Pick-KindByNumber([string]$title) {
+          $kinds = @(Get-AdminKinds)
+          if ($kinds.Count -eq 0) { return $null }
+          Write-Host "" 
+          Write-Host $title -ForegroundColor Cyan
+          Print-NumberedList $kinds
+          Write-Host "0) Cancel" 
+          $pick = Read-ChoiceOrEsc ("Choose kind (0-{0})" -f $kinds.Count)
+          if ($null -eq $pick -or $pick -eq '0') { return $null }
+          $n = 0
+          if (-not [int]::TryParse($pick, [ref]$n)) { return $null }
+          if ($n -lt 1 -or $n -gt $kinds.Count) { return $null }
+          return $kinds[$n - 1]
+        }
+
+        while ($true) {
+          Safe-Clear
+          Write-Host "Kind admin:" -ForegroundColor Cyan
+          Write-Host "1) List kinds" 
+          Write-Host "2) Disable kind" 
+          Write-Host "3) Enable kind" 
+          Write-Host "4) Delete kind (removes kind + keywordSets + overrides)" 
+          Write-Host "0) Back" 
+          Write-Host "(Tip: pick by NUMBER; ESC also goes back)" -ForegroundColor DarkGray
+
+          $c = Read-ChoiceOrEsc 'Choose (0-4)'
+          if ($null -eq $c -or $c -eq '0') { break }
+
+          switch ($c) {
+            '1' {
+              $kinds = @(Get-AdminKinds)
+              Write-Host "Kinds:" -ForegroundColor Cyan
+              Print-NumberedList $kinds
+              Wait-AnyKeyOrEsc
+            }
+            '2' {
+              $k = Pick-KindByNumber 'Disable which kind?'
+              if ($null -eq $k) { break }
+              & $admin disable -Kind $k | Out-Host
+              Wait-AnyKeyOrEsc
+            }
+            '3' {
+              $k = Pick-KindByNumber 'Enable which kind?'
+              if ($null -eq $k) { break }
+              & $admin enable -Kind $k | Out-Host
+              Wait-AnyKeyOrEsc
+            }
+            '4' {
+              $k = Pick-KindByNumber 'DELETE which kind?'
+              if ($null -eq $k) { break }
+              Write-Host ("You are about to DELETE kind: {0}" -f $k) -ForegroundColor Yellow
+              Write-Host "Type DELETE to confirm:" -ForegroundColor Yellow
+              $confirm = Read-ChoiceOrEsc 'Confirm'
+              if ($confirm -ne 'DELETE') { Write-Host 'Canceled.' -ForegroundColor DarkGray; Wait-AnyKeyOrEsc; break }
+              & $admin delete -Kind $k -Force | Out-Host
+              Wait-AnyKeyOrEsc
+            }
           }
         }
       }
