@@ -435,8 +435,8 @@ while ($true) {
   Write-Host
   Write-Host "1) Model catalog (auto fetch / refresh)"
   Write-Host "2) Kind -> model selection (priority lists)"
-  Write-Host "3) Keywords add/remove (paste-only overrides)"
-  Write-Host "4) Add kind (new top-level kind; higher than fallback)"
+  Write-Host "3) Add kind (new top-level kind; higher than fallback)"
+  Write-Host "4) Keywords add/remove (paste-only overrides)"
   Write-Host "5) Route preview (local scoring; no LLM)"
   Write-Host "6) Show current kind -> models"
   Write-Host "0) Exit"
@@ -448,17 +448,17 @@ while ($true) {
     switch ($choice) {
       '1' { Run-Catalog }
       '2' { Run-Models }
-      '3' { Run-Keywords }
-      '4' {
+      '3' {
         $addKind = Join-Path $toolsDir 'add-kind.ps1'
         Write-Host "New kind id format: lowercase letters/digits/underscore, start with a letter (e.g. finance_ai)." -ForegroundColor DarkGray
         $kid = Read-ChoiceOrEsc 'Enter new kind id'
         if ($null -ne $kid -and $kid -ne '') {
           & $addKind -Kind $kid | Out-Host
-          Write-Host "Added kind. Next: configure keywords (menu 3) and model priority (menu 2)." -ForegroundColor Green
+          Write-Host "Added kind. Next: configure keywords (menu 4) and model priority (menu 2)." -ForegroundColor Green
           Wait-AnyKeyOrEsc
         }
       }
+      '4' { Run-Keywords }
       '5' { Run-Preview }
       '6' { Show-CurrentKindModels; Wait-AnyKeyOrEsc }
       '0' { break }
