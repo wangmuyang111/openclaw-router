@@ -69,28 +69,81 @@ function Run-Catalog {
 }
 
 function Run-Models {
-  Write-Host "=== Kind -> Model Selection (Priority List) ===" -ForegroundColor Cyan
-  Write-Host "Policy note: you can save lists here; runtime switching can remain disabled." -ForegroundColor DarkGray
-  Write-Host
-  Write-Host "1) Show current kind -> model list" 
-  Write-Host "2) Set ALL kinds to one model" 
-  Write-Host "3) Set ONE kind to one model" 
-  Write-Host "4) Back" 
-  $c = Read-Host 'Choose (1-4)'
-  switch ($c) {
-    '1' { Show-CurrentKindModels }
-    '2' {
-      $m = Read-Host 'ModelId (default: local-proxy/gpt-5.2)'
-      if ([string]::IsNullOrWhiteSpace($m)) { $m = 'local-proxy/gpt-5.2' }
-      & $setModelsScript -ModelId $m | Out-Host
+  $kindModelsScript = Join-Path $toolsDir 'kind-models.ps1'
+
+  while ($true) {
+    Clear-Host
+    Write-Host "=== Kind -> Model Selection (Priority Lists) ===" -ForegroundColor Cyan
+    Write-Host "Choose a kind to manage its model priority list." -ForegroundColor DarkGray
+    Write-Host
+
+    $kinds = List-Kinds
+    $i = 1
+    foreach ($k in $kinds) {
+      Write-Host ("{0}) {1}" -f $i, $k)
+      $i++
     }
-    '3' {
-      $kinds = List-Kinds
-      Write-Host ('Available kinds: ' + ($kinds -join ', ')) -ForegroundColor DarkGray
-      $k = Read-Host 'Kind'
-      $m = Read-Host 'ModelId (default: local-proxy/gpt-5.2)'
-      if ([string]::IsNullOrWhiteSpace($m)) { $m = 'local-proxy/gpt-5.2' }
-      & $setModelsScript -Kind $k -ModelId $m | Out-Host
+    Write-Host "0) Back"
+
+    $pick = Read-Host ("Choose (0-{0})" -f $kinds.Count)
+    if ($pick -eq '0') { break }
+
+    $idx = -1
+    if (-not [int]::TryParse($pick, [ref]$idx)) { continue }
+    $idx = $idx - 1
+    if ($idx -lt 0 -or $idx -ge $kinds.Count) { continue }
+
+    $kind = $kinds[$idx]
+
+    while ($true) {
+      Clear-Host
+      Write-Host ("=== Kind: {0} ===" -f $kind) -ForegroundColor Green
+      Write-Host
+      Write-Host "1) Show current model list"
+      Write-Host "2) Add model (append)"
+      Write-Host "3) Remove model"
+      Write-Host "4) Move model (reorder by index)"
+      Write-Host "5) Pin model to TOP"
+      Write-Host "0) Back"
+
+      $c = Read-Host 'Choose (0-5)'
+      if ($c -eq '0') { break }
+
+      try {
+        switch ($c) {
+          '1' {
+            & $kindModelsScript show -Kind $kind | Out-Host
+          }
+          '2' {
+            $m = Read-Host 'ModelId to add'
+            & $kindModelsScript add -Kind $kind -ModelId $m | Out-Host
+            & $kindModelsScript show -Kind $kind | Out-Host
+          }
+          '3' {
+            $m = Read-Host 'ModelId to remove'
+            & $kindModelsScript remove -Kind $kind -ModelId $m | Out-Host
+            & $kindModelsScript show -Kind $kind | Out-Host
+          }
+          '4' {
+            & $kindModelsScript show -Kind $kind | Out-Host
+            $from = Read-Host 'FromIndex (0-based)'
+            $to = Read-Host 'ToIndex (0-based)'
+            & $kindModelsScript move -Kind $kind -FromIndex ([int]$from) -ToIndex ([int]$to) | Out-Host
+            & $kindModelsScript show -Kind $kind | Out-Host
+          }
+          '5' {
+            & $kindModelsScript show -Kind $kind | Out-Host
+            $m = Read-Host 'ModelId to pin to TOP'
+            & $kindModelsScript top -Kind $kind -ModelId $m | Out-Host
+            & $kindModelsScript show -Kind $kind | Out-Host
+          }
+        }
+      } catch {
+        Write-Host ("ERROR: " + $_.Exception.Message) -ForegroundColor Red
+      }
+
+      Write-Host
+      Read-Host 'Press Enter to continue' | Out-Null
     }
   }
 }
