@@ -17,6 +17,11 @@ function Pause-Any {
   Read-Host 'Press Enter to continue' | Out-Null
 }
 
+function Safe-Clear {
+  # Some non-interactive hosts throw when clearing screen.
+  try { Clear-Host } catch { }
+}
+
 function Read-MultiLine([string]$prompt, [string]$terminator = 'END') {
   Write-Host $prompt -ForegroundColor Cyan
   Write-Host "Paste text now. Finish with a single line: $terminator" -ForegroundColor DarkGray
@@ -68,11 +73,91 @@ function Run-Catalog {
   elseif ($c -eq '2') { & $catalogScript -Refresh | Out-Host }
 }
 
+function Get-KindModelList([string]$kind) {
+  $lib = Load-Library
+  $kr = $lib.kinds.$kind
+  if ($null -eq $kr) { return @() }
+  try { return @($kr.models.list) } catch { return @() }
+}
+
+function Print-NumberedList($arr) {
+  if ($null -eq $arr -or $arr.Count -eq 0) {
+    Write-Host "(empty)" -ForegroundColor DarkGray
+    return
+  }
+  for ($i = 0; $i -lt $arr.Count; $i++) {
+    Write-Host ("{0}) {1}" -f ($i + 1), $arr[$i])
+  }
+}
+
+function Parse-IndexList([string]$s, [int]$max) {
+  # Accept: "1" or "1,2,5" or "1 2 5". Returns 0-based unique indices.
+  if ([string]::IsNullOrWhiteSpace($s)) { return @() }
+  $parts = $s -split '[,\s]+' | Where-Object { $_ -ne '' }
+  $out = New-Object System.Collections.Generic.HashSet[int]
+  foreach ($p in $parts) {
+    $n = 0
+    if (-not [int]::TryParse($p, [ref]$n)) { continue }
+    if ($n -lt 1 -or $n -gt $max) { continue }
+    [void]$out.Add($n - 1)
+  }
+  return @($out | Sort-Object)
+}
+
+function Get-CatalogModels {
+  # catalog.ps1 prints plain model IDs (one per line).
+  return @(& $catalogScript)
+}
+
+function Reorder-Menu([string]$kind, [string]$kindModelsScript) {
+  while ($true) {
+    $list = @(Get-KindModelList $kind)
+    Write-Host
+    Write-Host "Reorder tools:" -ForegroundColor Cyan
+    Write-Host "1) Move (by number)" 
+    Write-Host "2) Pin to TOP (by number)" 
+    Write-Host "0) Done" 
+    $c = Read-Host 'Choose (0-2)'
+    if ($c -eq '0') { break }
+
+    if ($list.Count -eq 0) {
+      Write-Host "List is empty." -ForegroundColor Yellow
+      continue
+    }
+
+    switch ($c) {
+      '1' {
+        Print-NumberedList $list
+        $from1 = Read-Host 'From (number)'
+        $to1 = Read-Host 'To (number)'
+        $from = 0; $to = 0
+        if (-not [int]::TryParse($from1, [ref]$from)) { continue }
+        if (-not [int]::TryParse($to1, [ref]$to)) { continue }
+        if ($from -lt 1 -or $from -gt $list.Count -or $to -lt 1 -or $to -gt $list.Count) { continue }
+        & $kindModelsScript move -Kind $kind -FromIndex ($from - 1) -ToIndex ($to - 1) | Out-Null
+        Write-Host "Updated." -ForegroundColor Green
+        Print-NumberedList @(Get-KindModelList $kind)
+      }
+      '2' {
+        Print-NumberedList $list
+        $pick = Read-Host 'Pin which number to TOP?'
+        $n = 0
+        if (-not [int]::TryParse($pick, [ref]$n)) { continue }
+        if ($n -lt 1 -or $n -gt $list.Count) { continue }
+        $mid = $list[$n - 1]
+        & $kindModelsScript top -Kind $kind -ModelId $mid | Out-Null
+        Write-Host "Pinned to top." -ForegroundColor Green
+        Print-NumberedList @(Get-KindModelList $kind)
+      }
+    }
+  }
+}
+
 function Run-Models {
   $kindModelsScript = Join-Path $toolsDir 'kind-models.ps1'
 
   while ($true) {
-    Clear-Host
+    Safe-Clear
     Write-Host "=== Kind -> Model Selection (Priority Lists) ===" -ForegroundColor Cyan
     Write-Host "Choose a kind to manage its model priority list." -ForegroundColor DarkGray
     Write-Host
@@ -96,54 +181,70 @@ function Run-Models {
     $kind = $kinds[$idx]
 
     while ($true) {
-      Clear-Host
+      Safe-Clear
       Write-Host ("=== Kind: {0} ===" -f $kind) -ForegroundColor Green
       Write-Host
       Write-Host "1) Show current model list"
-      Write-Host "2) Add model (append)"
-      Write-Host "3) Remove model"
-      Write-Host "4) Move model (reorder by index)"
-      Write-Host "5) Pin model to TOP"
+      Write-Host "2) Add model (pick from catalog)"
+      Write-Host "3) Remove model (pick by number)"
       Write-Host "0) Back"
 
-      $c = Read-Host 'Choose (0-5)'
+      $c = Read-Host 'Choose (0-3)'
       if ($c -eq '0') { break }
 
       try {
         switch ($c) {
           '1' {
-            & $kindModelsScript show -Kind $kind | Out-Host
+            $list = @(Get-KindModelList $kind)
+            Write-Host "Current models:" -ForegroundColor Cyan
+            Print-NumberedList $list
+            Reorder-Menu $kind $kindModelsScript
           }
           '2' {
-            $m = Read-Host 'ModelId to add'
-            & $kindModelsScript add -Kind $kind -ModelId $m | Out-Host
-            & $kindModelsScript show -Kind $kind | Out-Host
+            $catalog = @(Get-CatalogModels)
+            if ($catalog.Count -eq 0) { throw 'Catalog is empty (run catalog refresh first?)' }
+            Write-Host "Catalog models (available):" -ForegroundColor Cyan
+            Print-NumberedList $catalog
+            $sel = Read-Host ("Select model number(s) to add (e.g. 1,3). 0=cancel")
+            if ($sel -eq '0') { break }
+            $idxs = Parse-IndexList $sel $catalog.Count
+            if ($idxs.Count -eq 0) { throw 'No valid selections.' }
+
+            foreach ($ii in $idxs) {
+              $mid = $catalog[$ii]
+              try { & $kindModelsScript add -Kind $kind -ModelId $mid | Out-Null } catch { }
+            }
+
+            Write-Host "Updated models:" -ForegroundColor Green
+            Print-NumberedList @(Get-KindModelList $kind)
+            Reorder-Menu $kind $kindModelsScript
           }
           '3' {
-            $m = Read-Host 'ModelId to remove'
-            & $kindModelsScript remove -Kind $kind -ModelId $m | Out-Host
-            & $kindModelsScript show -Kind $kind | Out-Host
-          }
-          '4' {
-            & $kindModelsScript show -Kind $kind | Out-Host
-            $from = Read-Host 'FromIndex (0-based)'
-            $to = Read-Host 'ToIndex (0-based)'
-            & $kindModelsScript move -Kind $kind -FromIndex ([int]$from) -ToIndex ([int]$to) | Out-Host
-            & $kindModelsScript show -Kind $kind | Out-Host
-          }
-          '5' {
-            & $kindModelsScript show -Kind $kind | Out-Host
-            $m = Read-Host 'ModelId to pin to TOP'
-            & $kindModelsScript top -Kind $kind -ModelId $m | Out-Host
-            & $kindModelsScript show -Kind $kind | Out-Host
+            $list = @(Get-KindModelList $kind)
+            Write-Host "Current models:" -ForegroundColor Cyan
+            Print-NumberedList $list
+            if ($list.Count -eq 0) { break }
+            $sel = Read-Host "Select model number(s) to remove (e.g. 2,4). 0=cancel"
+            if ($sel -eq '0') { break }
+            $idxs = Parse-IndexList $sel $list.Count
+            if ($idxs.Count -eq 0) { throw 'No valid selections.' }
+
+            # remove by ModelId (remove in descending index order for safety)
+            foreach ($ii in ($idxs | Sort-Object -Descending)) {
+              $mid = $list[$ii]
+              & $kindModelsScript remove -Kind $kind -ModelId $mid | Out-Null
+            }
+
+            Write-Host "Updated models:" -ForegroundColor Green
+            Print-NumberedList @(Get-KindModelList $kind)
+            Reorder-Menu $kind $kindModelsScript
           }
         }
       } catch {
         Write-Host ("ERROR: " + $_.Exception.Message) -ForegroundColor Red
+        Write-Host
+        Read-Host 'Press Enter to continue' | Out-Null
       }
-
-      Write-Host
-      Read-Host 'Press Enter to continue' | Out-Null
     }
   }
 }
@@ -206,7 +307,7 @@ if ($Mode -ne 'menu') {
 }
 
 while ($true) {
-  Clear-Host
+  Safe-Clear
   Write-Host "Soft Router Suggest — Settings Menu" -ForegroundColor Green
   Write-Host "(No plugin enable required; safe to use while router plugin stays disabled.)" -ForegroundColor DarkGray
   Write-Host
