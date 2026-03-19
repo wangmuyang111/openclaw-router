@@ -437,12 +437,13 @@ while ($true) {
   Write-Host "2) Kind -> model selection (priority lists)"
   Write-Host "3) Add kind (new top-level kind; higher than fallback)"
   Write-Host "4) Keywords add/remove (paste-only overrides)"
-  Write-Host "5) Route preview (local scoring; no LLM)"
-  Write-Host "6) Show current kind -> models"
+  Write-Host "5) Kind admin (disable / delete kind)"
+  Write-Host "6) Route preview (local scoring; no LLM)"
+  Write-Host "7) Show current kind -> models"
   Write-Host "0) Exit"
 
   Write-Host "(Tip: press ESC to go back)" -ForegroundColor DarkGray
-  $choice = Read-ChoiceOrEsc 'Choose (0-6)'
+  $choice = Read-ChoiceOrEsc 'Choose (0-7)'
   if ($null -eq $choice) { continue }
   try {
     switch ($choice) {
@@ -459,8 +460,45 @@ while ($true) {
         }
       }
       '4' { Run-Keywords }
-      '5' { Run-Preview }
-      '6' { Show-CurrentKindModels; Wait-AnyKeyOrEsc }
+      '5' {
+        $admin = Join-Path $toolsDir 'kind-admin.ps1'
+        Write-Host "Kind admin:" -ForegroundColor Cyan
+        Write-Host "1) List kinds" 
+        Write-Host "2) Disable kind" 
+        Write-Host "3) Enable kind" 
+        Write-Host "4) Delete kind (removes kind + keywordSets + overrides)" 
+        Write-Host "0) Back" 
+        Write-Host "(ESC also goes back)" -ForegroundColor DarkGray
+        $c = Read-ChoiceOrEsc 'Choose (0-4)'
+        if ($null -eq $c -or $c -eq '0') { continue }
+
+        switch ($c) {
+          '1' { & $admin list | Out-Host; Wait-AnyKeyOrEsc }
+          '2' {
+            $k = Read-ChoiceOrEsc 'Kind to disable'
+            if ($null -eq $k -or $k -eq '') { break }
+            & $admin disable -Kind $k | Out-Host
+            Wait-AnyKeyOrEsc
+          }
+          '3' {
+            $k = Read-ChoiceOrEsc 'Kind to enable'
+            if ($null -eq $k -or $k -eq '') { break }
+            & $admin enable -Kind $k | Out-Host
+            Wait-AnyKeyOrEsc
+          }
+          '4' {
+            $k = Read-ChoiceOrEsc 'Kind to DELETE'
+            if ($null -eq $k -or $k -eq '') { break }
+            Write-Host "Type DELETE to confirm:" -ForegroundColor Yellow
+            $confirm = Read-ChoiceOrEsc 'Confirm'
+            if ($confirm -ne 'DELETE') { Write-Host 'Canceled.' -ForegroundColor DarkGray; Wait-AnyKeyOrEsc; break }
+            & $admin delete -Kind $k -Force | Out-Host
+            Wait-AnyKeyOrEsc
+          }
+        }
+      }
+      '6' { Run-Preview }
+      '7' { Show-CurrentKindModels; Wait-AnyKeyOrEsc }
       '0' { break }
       default { Write-Host 'Invalid choice' -ForegroundColor Yellow; Wait-AnyKeyOrEsc }
     }
