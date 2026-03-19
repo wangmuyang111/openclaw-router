@@ -62,19 +62,27 @@ $ov = Load-Overrides
 switch ($Action) {
   'list' {
     Write-Host "=== User Keyword Overrides ==="
-    if (-not $ov.sets -or $ov.sets.PSObject.Properties.Count -eq 0) {
+    $sets = $ov.sets
+    if ($null -eq $sets) {
       Write-Host "No overrides configured."
-    } else {
-      foreach ($prop in $ov.sets.PSObject.Properties) {
-        $sid = $prop.Name
-        $sdata = $prop.Value
-        Write-Host "Set: $sid"
-        if ($sdata.add -and $sdata.add.Count -gt 0) {
-          Write-Host "  + Add   : $($sdata.add -join ', ')"
-        }
-        if ($sdata.remove -and $sdata.remove.Count -gt 0) {
-          Write-Host "  - Remove: $($sdata.remove -join ', ')"
-        }
+      break
+    }
+
+    $props = $sets.PSObject.Properties | Where-Object { $_.MemberType -eq 'NoteProperty' }
+    if ($props.Count -eq 0) {
+      Write-Host "No overrides configured."
+      break
+    }
+
+    foreach ($prop in $props) {
+      $sid = $prop.Name
+      $sdata = $prop.Value
+      Write-Host "Set: $sid"
+      if ($sdata.add -and $sdata.add.Count -gt 0) {
+        Write-Host "  + Add   : $($sdata.add -join ', ')"
+      }
+      if ($sdata.remove -and $sdata.remove.Count -gt 0) {
+        Write-Host "  - Remove: $($sdata.remove -join ', ')"
       }
     }
   }
