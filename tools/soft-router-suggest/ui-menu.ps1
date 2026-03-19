@@ -249,6 +249,49 @@ function Run-Models {
   }
 }
 
+function Pick-KindForKeywords {
+  $kinds = List-Kinds
+  Write-Host "Choose kind:" -ForegroundColor Cyan
+  for ($i = 0; $i -lt $kinds.Count; $i++) {
+    Write-Host ("{0}) {1}" -f ($i + 1), $kinds[$i])
+  }
+  Write-Host "0) Cancel"
+  $pick = Read-Host ("Choose (0-{0})" -f $kinds.Count)
+  if ($pick -eq '0') { return $null }
+  $n = 0
+  if (-not [int]::TryParse($pick, [ref]$n)) { return $null }
+  if ($n -lt 1 -or $n -gt $kinds.Count) { return $null }
+  return $kinds[$n - 1]
+}
+
+function Pick-SetIdForKind([string]$kind) {
+  $setsAll = List-Sets
+  $sets = @($setsAll | Where-Object { $_ -like "$kind.*" } | Sort-Object)
+  if ($sets.Count -eq 0) { throw "No keyword sets found for kind '$kind'" }
+
+  Write-Host
+  Write-Host ("Keyword sets for kind '{0}':" -f $kind) -ForegroundColor Cyan
+  for ($i = 0; $i -lt $sets.Count; $i++) {
+    Write-Host ("{0}) {1}" -f ($i + 1), $sets[$i])
+  }
+  Write-Host "0) Cancel"
+
+  $pick = Read-Host ("Choose (0-{0})" -f $sets.Count)
+  if ($pick -eq '0') { return $null }
+  $n = 0
+  if (-not [int]::TryParse($pick, [ref]$n)) { return $null }
+  if ($n -lt 1 -or $n -gt $sets.Count) { return $null }
+  return $sets[$n - 1]
+}
+
+function Show-KindContext([string]$kind) {
+  Write-Host
+  Write-Host ("Selected kind: {0}" -f $kind) -ForegroundColor Green
+  Write-Host "Current model priority list for this kind:" -ForegroundColor DarkGray
+  $ml = @(Get-KindModelList $kind)
+  Print-NumberedList $ml
+}
+
 function Run-Keywords {
   Write-Host "=== Keywords (Paste-only overrides) ===" -ForegroundColor Cyan
   Write-Host "Format:" -ForegroundColor DarkGray
@@ -265,22 +308,33 @@ function Run-Keywords {
 
   switch ($c) {
     '1' { & $overridesScript list | Out-Host }
+
     '2' {
-      $sets = List-Sets
-      Write-Host ('Available sets (examples): ' + (($sets | Select-Object -First 15) -join ', ') + ' ...') -ForegroundColor DarkGray
-      $setId = Read-Host 'SetId (e.g. coding.strong / planning.weak / quick_response.negative)'
-      $paste = Read-MultiLine -prompt 'Paste keywords to ADD:'
+      $kind = Pick-KindForKeywords
+      if ($null -eq $kind) { break }
+      Show-KindContext $kind
+      $setId = Pick-SetIdForKind $kind
+      if ($null -eq $setId) { break }
+      $paste = Read-MultiLine -prompt ("Paste keywords to ADD into {0}:" -f $setId)
       & $overridesScript add -SetId $setId -PastedText $paste | Out-Host
     }
+
     '3' {
-      $sets = List-Sets
-      Write-Host ('Available sets (examples): ' + (($sets | Select-Object -First 15) -join ', ') + ' ...') -ForegroundColor DarkGray
-      $setId = Read-Host 'SetId'
-      $paste = Read-MultiLine -prompt 'Paste keywords to REMOVE:'
+      $kind = Pick-KindForKeywords
+      if ($null -eq $kind) { break }
+      Show-KindContext $kind
+      $setId = Pick-SetIdForKind $kind
+      if ($null -eq $setId) { break }
+      $paste = Read-MultiLine -prompt ("Paste keywords to REMOVE from {0}:" -f $setId)
       & $overridesScript remove -SetId $setId -PastedText $paste | Out-Host
     }
+
     '4' {
-      $setId = Read-Host 'SetId to clear'
+      $kind = Pick-KindForKeywords
+      if ($null -eq $kind) { break }
+      Show-KindContext $kind
+      $setId = Pick-SetIdForKind $kind
+      if ($null -eq $setId) { break }
       & $overridesScript clear -SetId $setId | Out-Host
     }
   }
