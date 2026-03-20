@@ -173,7 +173,8 @@ function Set-ConfigValue($cfgObj, [string]$name, $value) {
 # NOTE: these are optional fields; we set them explicitly to avoid confusing "blank" status output.
 Set-ConfigValue $entry.config 'ruleEngineEnabled' $true
 Set-ConfigValue $entry.config 'routerLlmEnabled' $false
-Set-ConfigValue $entry.config 'switchingEnabled' $true
+# IMPORTANT: keep switching disabled by default; plugin runs in suggest/log-only mode.
+Set-ConfigValue $entry.config 'switchingEnabled' $false
 
 # Safety default: never auto-switch chat kind
 if ($null -eq $entry.config.PSObject.Properties['switchingAllowChat']) {
