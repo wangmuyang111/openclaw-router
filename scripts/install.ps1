@@ -44,21 +44,40 @@ Write-Host "OpenClaw home: $openclawHome"
 Write-Host "Workspace: $workspace"
 
 # 1) Copy plugin
-Copy-Item -Force (Join-Path $repoRoot 'plugin\index.ts') (Join-Path $extDir 'index.ts')
-Copy-Item -Force (Join-Path $repoRoot 'plugin\classification-loader.ts') (Join-Path $extDir 'classification-loader.ts')
-Copy-Item -Force (Join-Path $repoRoot 'plugin\classification-engine.ts') (Join-Path $extDir 'classification-engine.ts')
-Copy-Item -Force (Join-Path $repoRoot 'plugin\openclaw.plugin.json') (Join-Path $extDir 'openclaw.plugin.json')
+# NOTE: repo may not contain legacy classification files anymore; copy only what exists.
+$pluginFiles = @(
+  'index.ts',
+  'openclaw.plugin.json',
+  'keyword-library.ts',
+  'weighted-routing-engine.ts',
+  'classification-loader.ts',
+  'classification-engine.ts'
+)
+foreach ($f in $pluginFiles) {
+  $src = Join-Path $repoRoot (Join-Path 'plugin' $f)
+  if (Test-Path -LiteralPath $src) {
+    Copy-Item -Force $src (Join-Path $extDir $f)
+  }
+}
 Write-Host "OK: plugin copied -> $extDir"
 
 # 2) Copy tools
 $toolFiles = @(
+  # Legacy (kept for compatibility / tooling)
   'router-rules.json',
   'model-priority.json',
   'classification-rules.json',
   'classification-rules.schema.json',
   'model-tags.json',
   'router-config.ps1',
-  'validate-classification.ps1'
+  'validate-classification.ps1',
+
+  # NEW (keyword-library routing)
+  'keyword-library.json',
+  'keyword-library.schema.json',
+  'keyword-overrides.user.schema.json',
+  'keyword-overrides.user.example.json',
+  'routing-rules.compiled.json'
 )
 foreach ($f in $toolFiles) {
   $src = Join-Path $repoRoot (Join-Path 'tools\soft-router-suggest' $f)
@@ -66,6 +85,17 @@ foreach ($f in $toolFiles) {
     Copy-Item -Force $src (Join-Path $toolsDir $f)
   }
 }
+
+# Ensure user overrides file exists (copy example only if missing).
+$overridesDst = Join-Path $toolsDir 'keyword-overrides.user.json'
+$overridesExample = Join-Path $repoRoot 'tools\soft-router-suggest\keyword-overrides.user.example.json'
+if (-not (Test-Path -LiteralPath $overridesDst)) {
+  if (Test-Path -LiteralPath $overridesExample) {
+    Copy-Item -Force $overridesExample $overridesDst
+    Write-Host "OK: created keyword-overrides.user.json from example"
+  }
+}
+
 Write-Host "OK: tools copied -> $toolsDir"
 
 # 3) Patch openclaw.json (backup first)

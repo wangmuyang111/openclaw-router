@@ -99,27 +99,52 @@ if (-not $nodeCmd) {
 $extDir = Join-Path $ws '.openclaw\extensions\soft-router-suggest'
 $toolsDir = Join-Path $ws 'tools\soft-router-suggest'
 $pluginOk = Test-Path -LiteralPath (Join-Path $extDir 'index.ts')
+
+# NEW routing engine files (keyword-library)
+$kwLibOk = Test-Path -LiteralPath (Join-Path $toolsDir 'keyword-library.json')
+$kwLibSchemaOk = Test-Path -LiteralPath (Join-Path $toolsDir 'keyword-library.schema.json')
+$kwOvOk = Test-Path -LiteralPath (Join-Path $toolsDir 'keyword-overrides.user.json')
+$kwOvSchemaOk = Test-Path -LiteralPath (Join-Path $toolsDir 'keyword-overrides.user.schema.json')
+
+# Keep legacy checks (non-blocking) for compatibility/tooling
 $rulesOk = Test-Path -LiteralPath (Join-Path $toolsDir 'router-rules.json')
 $prioOk = Test-Path -LiteralPath (Join-Path $toolsDir 'model-priority.json')
 $classRulesOk = Test-Path -LiteralPath (Join-Path $toolsDir 'classification-rules.json')
 $classSchemaOk = Test-Path -LiteralPath (Join-Path $toolsDir 'classification-rules.schema.json')
 
 $pluginLabel = if ($pluginOk) { 'OK' } else { 'MISSING' }
+$kwLibLabel = if ($kwLibOk) { 'OK' } else { 'MISSING' }
+$kwLibSchemaLabel = if ($kwLibSchemaOk) { 'OK' } else { 'MISSING' }
+$kwOvLabel = if ($kwOvOk) { 'OK' } else { 'MISSING' }
+$kwOvSchemaLabel = if ($kwOvSchemaOk) { 'OK' } else { 'MISSING' }
+
 $rulesLabel = if ($rulesOk) { 'OK' } else { 'MISSING' }
 $prioLabel = if ($prioOk) { 'OK' } else { 'MISSING' }
 $classRulesLabel = if ($classRulesOk) { 'OK' } else { 'MISSING' }
 $classSchemaLabel = if ($classSchemaOk) { 'OK' } else { 'MISSING' }
+
 Say 'plugin installed' $pluginLabel
-Say 'rules file' $rulesLabel
+Say 'keyword library' $kwLibLabel
+Say 'keyword schema' $kwLibSchemaLabel
+Say 'keyword overrides' $kwOvLabel
+Say 'overrides schema' $kwOvSchemaLabel
+
+Say 'rules file (legacy)' $rulesLabel
 Say 'priority file' $prioLabel
-Say 'classification rules' $classRulesLabel
-Say 'classification schema' $classSchemaLabel
+Say 'classification rules (legacy)' $classRulesLabel
+Say 'classification schema (legacy)' $classSchemaLabel
 
 if (-not $pluginOk) { $issues.Add("Plugin not installed: $extDir\index.ts") | Out-Null }
-if (-not $rulesOk) { $issues.Add("Missing rules file: $toolsDir\router-rules.json") | Out-Null }
-if (-not $prioOk) { $issues.Add("Missing priority file: $toolsDir\model-priority.json") | Out-Null }
-if (-not $classRulesOk) { $issues.Add("Missing classification rules: $toolsDir\classification-rules.json") | Out-Null }
-if (-not $classSchemaOk) { $issues.Add("Missing classification schema: $toolsDir\classification-rules.schema.json") | Out-Null }
+if (-not $kwLibOk) { $issues.Add("Missing keyword library: $toolsDir\keyword-library.json") | Out-Null }
+if (-not $kwLibSchemaOk) { $issues.Add("Missing keyword library schema: $toolsDir\keyword-library.schema.json") | Out-Null }
+if (-not $kwOvOk) { $issues.Add("Missing keyword overrides: $toolsDir\keyword-overrides.user.json") | Out-Null }
+if (-not $kwOvSchemaOk) { $issues.Add("Missing keyword overrides schema: $toolsDir\keyword-overrides.user.schema.json") | Out-Null }
+
+# Legacy files are warnings only (do not block keyword-library routing)
+if (-not $rulesOk) { $warnings.Add("Legacy rules file missing: $toolsDir\router-rules.json") | Out-Null }
+if (-not $classRulesOk) { $warnings.Add("Legacy classification rules missing: $toolsDir\classification-rules.json") | Out-Null }
+if (-not $classSchemaOk) { $warnings.Add("Legacy classification schema missing: $toolsDir\classification-rules.schema.json") | Out-Null }
+if (-not $prioOk) { $warnings.Add("Priority file missing: $toolsDir\model-priority.json") | Out-Null }
 
 # sidecar (optional)
 $port = 18888
