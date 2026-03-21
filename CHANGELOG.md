@@ -23,9 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Suggest-only mode**: Analyzes messages but never auto-switches models for user chat
 - **Internal routing**: Automatically switches models for agent sub-tasks
 - **Multi-category support**: 
-  - planning, coding, vision, daily_support
-  - quick_response, emergency_fallback, advanced_coding
-  - general, chat, default
+  - strategy, coding, vision
+  - support, general, chat
 - **Provider auth awareness**: Detects expired OAuth tokens
 - **Deduplication**: Prevents log spam from repeated suggestions
 - **Echo mode**: Optional suggestion display in replies
@@ -37,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cross-process deduplication locks
 
 ## [Unreleased]
+
+### Added
+- Added `tools/soft-router-suggest/KIND_GUIDE.zh-CN.md`: a detailed Chinese technical + user guidance document for the simplified 6-kind router, with focus on the first five major kinds (`strategy`, `coding`, `vision`, `support`, `general`).
 
 ### Planned
 - GitHub Actions CI/CD workflow

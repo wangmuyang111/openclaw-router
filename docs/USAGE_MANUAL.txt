@@ -1,17 +1,47 @@
-OpenClaw 硬路由（soft-router-suggest）GitHub 版使用手册
-版本：2026-02-09
+OpenClaw Soft Router（soft-router-suggest）命令手册
+版本：当前 6 类简化版 / 提交前同步版
+
+这是什么：
+- 这是 **完整命令手册**
+- 如果你只想最快上手，请先看：`docs/QUICK_START.zh-CN.md`
+- 如果你想改关键词 / 模型 / 设置，请看：`tools/soft-router-suggest/README_SETTINGS.md`
+
+============================================================
+0) 最短命令（先抄这个）
+============================================================
+Windows：
+
+  npm install
+  npm run build
+  npm run windows:install
+  npm run windows:doctor
+
+Linux：
+
+  npm install
+  npm run build
+  chmod +x scripts/*.sh
+  ./scripts/install.sh
+  ./scripts/doctor.sh
+
+Node CLI：
+
+  npm install
+  npm run build
+  npm run openclaw:install -- --dry-run
+  npm run openclaw:doctor
 
 ============================================================
 1) 安装 / 卸载
 ============================================================
-安装（会备份 openclaw.json 并自动写入 plugins.entries.soft-router-suggest；默认启用 RULES 模式）：
+安装（会备份 openclaw.json；默认是安全模式：启用插件、启用规则引擎、关闭自动切换）：
 
-  powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
+  .\scripts\install.ps1
 
-卸载（默认仅禁用插件；如需删除文件加 -RemoveFiles）：
+卸载（默认仅禁用插件；如需删除已复制文件，加 -RemoveFiles）：
 
-  powershell -ExecutionPolicy Bypass -File .\scripts\uninstall.ps1
-  powershell -ExecutionPolicy Bypass -File .\scripts\uninstall.ps1 -RemoveFiles
+  .\scripts\uninstall.ps1
+  .\scripts\uninstall.ps1 -RemoveFiles
 
 ============================================================
 2) Doctor 环境检查（只读，不修改任何文件）
@@ -27,14 +57,18 @@ OpenClaw 硬路由（soft-router-suggest）GitHub 版使用手册
 FAST（最快：禁用插件，走默认模型链）：
   .\scripts\router.ps1 fast
 
-RULES（启用规则引擎：关键词路由）：
+RULES（启用插件 + 规则引擎 + 自动切换；不启用 Router LLM）：
   .\scripts\router.ps1 rules
 
-LLM（规则引擎 + Sidecar Router LLM，可能更慢/受冷却影响）：
+LLM（启用插件 + 规则引擎 + Router LLM + 自动切换）：
   .\scripts\router.ps1 llm
 
+说明：
+- install 默认不是“强制切换模式”，而是更安全的 suggest/log-first 状态
+- 如需真正做规则切换测试，请显式执行 `.\scripts\router.ps1 rules`
+
 ============================================================
-3) Sidecar 管理（LLM 模式需要）
+4) Sidecar 管理（仅 LLM 模式需要）
 ============================================================
 启动：
   .\scripts\router.ps1 sidecar-start
@@ -45,20 +79,79 @@ LLM（规则引擎 + Sidecar Router LLM，可能更慢/受冷却影响）：
 停止：
   .\scripts\router.ps1 sidecar-stop
 
-备注：看到 “Exec failed ... listening ...” 不一定是失败；以 /health 为准。
+备注：看到“Exec failed ... listening ...”不一定代表失败；以 `/health` 为准。
 
 ============================================================
-4) 手动刷新 Model Catalog（可用模型列表）
+5) 控制 UI
 ============================================================
-默认刷新周期是 10 分钟（catalogTtlMs=600000）。
-如需立刻刷新一次，但不改 TTL：
+进入目录：
 
-  .\scripts\router.ps1 catalog-refresh
+  cd .\tools\soft-router-suggest
 
-说明：这是“请求刷新”。下一次消息经过路由时插件会消费旗标并强制刷新。
+启动主菜单：
+
+  .\ui-menu.ps1
+
+当前主菜单能力：
+- 模型目录
+- 类别管理
+- 查看类别对应模型列表
+- 类别模型的选定与修改
+- 类别关键词管理
+- 路由测试
+- 语言
+
+当前 UI 特点：
+- 支持 `zh / en / both`
+- 语言模式持久化到 `ui.settings.json`
+- 关键词列表显示的是“实际生效关键词”
+- 删除关键词支持“按编号选择”
+- 路由测试为“单行输入，回车直接提交”
 
 ============================================================
-5) 常用路径（用户机器上）
+6) 关键词与用户覆盖
+============================================================
+基础关键词库：
+  tools\soft-router-suggest\keyword-library.json
+
+用户覆盖文件：
+  tools\soft-router-suggest\keyword-overrides.user.json
+
+示例文件：
+  tools\soft-router-suggest\keyword-overrides.user.example.json
+
+支持的关键词集合形式：
+- `kind.strong`
+- `kind.weak`
+- `kind.negative`
+
+含义：
+- strong：强特征核心词
+- weak：辅助相关词
+- negative：排除词或其他类别强特征核心词
+
+============================================================
+7) 命令行工具（不经过 UI）
+============================================================
+查看 / 刷新模型目录：
+  .\catalog.ps1
+  .\catalog.ps1 -Refresh
+
+设置某类模型列表：
+  .\set-kind-models.ps1 -Kind strategy -ModelId local-proxy/gpt-5.4
+
+管理 overrides：
+  .\manage-overrides.ps1 list
+  .\manage-overrides.ps1 add -SetId coding.strong -PastedText "TypeError`nTraceback"
+  .\manage-overrides.ps1 remove -SetId strategy.weak -PastedText "gantt"
+  .\manage-overrides.ps1 clear -SetId coding.strong
+
+本地路由测试（不调用 LLM）：
+  .\route-preview.ps1 -Text "请帮我修复这个 TypeError"
+  .\route-preview.ps1 -Text "我有一张截图" -HasImage
+
+============================================================
+8) 常用路径（用户机器上）
 ============================================================
 OpenClaw home：
   %USERPROFILE%\.openclaw
@@ -66,9 +159,27 @@ OpenClaw home：
 插件运行时目录：
   %USERPROFILE%\.openclaw\workspace\.openclaw\extensions\soft-router-suggest
 
-规则与模型优先级：
-  %USERPROFILE%\.openclaw\workspace\tools\soft-router-suggest\router-rules.json
+工具目录：
+  %USERPROFILE%\.openclaw\workspace\tools\soft-router-suggest
+
+当前关键文件：
+  %USERPROFILE%\.openclaw\workspace\tools\soft-router-suggest\keyword-library.json
   %USERPROFILE%\.openclaw\workspace\tools\soft-router-suggest\model-priority.json
+  %USERPROFILE%\.openclaw\workspace\tools\soft-router-suggest\ui-menu.ps1
+  %USERPROFILE%\.openclaw\workspace\tools\soft-router-suggest\ui.settings.json
+
+============================================================
+9) 当前六分类
+============================================================
+- strategy
+- coding
+- vision
+- support
+- general
+- chat
+
+如需详细说明，参见：
+  tools\soft-router-suggest\KIND_GUIDE.zh-CN.md
 
 ============================================================
 完
