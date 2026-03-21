@@ -316,6 +316,25 @@ function providerFromModel(model: string): string {
   return idx > 0 ? m.slice(0, idx) : m;
 }
 
+/**
+ * Embedded runner + OpenAI-compatible gateways (like our local-proxy) expect the HTTP `model` field
+ * to be a *providerless* model id (e.g. "gpt-5.2"), not an OpenClaw catalog key like
+ * "local-proxy/gpt-5.2".
+ *
+ * When we return modelOverride from before_agent_start, OpenClaw may pass it through to the provider.
+ * To avoid 502 loops ("unknown provider for model local-proxy/...") we normalize here.
+ *
+ * Note: this intentionally reduces cross-provider switching for embedded runs; it's a safety fix.
+ */
+function normalizeModelOverrideForProvider(modelKey: string): { override: string; normalizedFrom?: string } {
+  const m = String(modelKey ?? "").trim();
+  const idx = m.indexOf("/");
+  if (idx > 0) {
+    return { override: m.slice(idx + 1), normalizedFrom: m };
+  }
+  return { override: m };
+}
+
 type AuthSnapshot = {
   providers: Record<string, { auth: "ok" | "expired" | "unknown"; remainingMs?: number }>;
   checkedAt: string;
@@ -1138,7 +1157,17 @@ export default function register(api: OpenClawPluginApi) {
           } catch {
             // ignore
           }
-          return { modelOverride: picked.picked };
+          const norm = normalizeModelOverrideForProvider(picked.picked);
+          try {
+            if (norm.normalizedFrom) {
+              console.log(
+                `[soft-router-suggest] model_override_normalized from=${norm.normalizedFrom} to=${norm.override} sessionKey=${sessionKey}`,
+              );
+            }
+          } catch {
+            // ignore
+          }
+          return { modelOverride: norm.override };
         }
 
         // Actually switch this run's model.
@@ -1169,7 +1198,17 @@ export default function register(api: OpenClawPluginApi) {
           // ignore
         }
 
-        return { modelOverride: picked.picked };
+        const norm = normalizeModelOverrideForProvider(picked.picked);
+        try {
+          if (norm.normalizedFrom) {
+            console.log(
+              `[soft-router-suggest] model_override_normalized from=${norm.normalizedFrom} to=${norm.override} sessionKey=${sessionKey}`,
+            );
+          }
+        } catch {
+          // ignore
+        }
+        return { modelOverride: norm.override };
       } catch {
         return;
       }
