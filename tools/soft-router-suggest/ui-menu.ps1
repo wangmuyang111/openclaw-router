@@ -1,4 +1,4 @@
-param(
+﻿param(
   [ValidateSet('menu','catalog','models','keywords','preview')]
   [string]$Mode = 'menu'
 )
@@ -270,7 +270,7 @@ function Print-KeywordFlow($arr, [int]$MaxWidth = 100) {
       continue
     }
 
-    $candidate = $line + '、' + $text
+    $candidate = $line + ', ' + $text
     if ($candidate.Length -le $MaxWidth) {
       $line = $candidate
     } else {

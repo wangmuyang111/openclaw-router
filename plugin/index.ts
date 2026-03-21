@@ -100,7 +100,7 @@ const DEFAULTS = {
 
   ruleEngineEnabled: false,
   switchingEnabled: false,
-  switchingMinConfidence: "high" as const,
+  switchingMinConfidence: "medium" as const,
   switchingAllowChat: false,
 
   get modelTagsPath() { return path.join(getDefaultToolsDir(), "model-tags.json"); },
@@ -975,6 +975,23 @@ type Suggestion = {
   fallback?: FallbackSuggestion;
 };
 
+type RouteDecision = {
+  sessionKey: string;
+  conversationId?: string;
+  channelId?: string;
+  messageId?: string;
+  messageHash: string;
+  contentPreview?: string;
+  kind: string;
+  confidence: Confidence;
+  candidateModel: string;
+  reason: string;
+  signals: string[];
+  createdAtMs: number;
+  expiresAtMs: number;
+  source: "message_received";
+};
+
 async function appendJsonl(api: OpenClawPluginApi, obj: unknown) {
   const cfg = resolveConfig(api);
   if (!cfg.enabled) return;
@@ -1021,6 +1038,9 @@ async function appendJsonl(api: OpenClawPluginApi, obj: unknown) {
 
 // Dedup map (in-memory, per process).
 const recentOverrides = new Map<string, number>();
+const routeDecisionBySession = new Map<string, RouteDecision>();
+const ROUTE_DECISION_TTL_MS = 90_000;
+const LONG_TASK_KINDS = new Set(["strategy", "coding", "vision"]);
 
 async function shouldLogModelOverride(
   cfg: { logDir: string },
@@ -1055,6 +1075,48 @@ async function shouldLogModelOverride(
 
   recentOverrides.set(memKey, now);
   return true;
+}
+
+function pruneExpiredRouteDecisions(now = Date.now()) {
+  for (const [key, value] of routeDecisionBySession.entries()) {
+    if (!value || value.expiresAtMs <= now) {
+      routeDecisionBySession.delete(key);
+    }
+  }
+}
+
+function resolveRouteSessionKeyFromMessageContext(
+  ctx: PluginHookMessageContext,
+  event: PluginHookMessageReceivedEvent,
+): string | null {
+  const metadata = (event.metadata ?? {}) as Record<string, unknown>;
+  const chatType = String(metadata.chat_type ?? metadata.chatType ?? "").toLowerCase();
+  const provider = String(metadata.provider ?? "").toLowerCase();
+  const channelId = String(ctx.channelId ?? "").toLowerCase();
+  const accountId = String(ctx.accountId ?? "").toLowerCase();
+  const from = String(event.from ?? "").toLowerCase();
+
+  const isGroupLike =
+    chatType === "group" ||
+    chatType === "channel" ||
+    from.includes(":group:") ||
+    from.includes(":channel:") ||
+    from.endsWith("@g.us") ||
+    channelId.includes("discord") ||
+    accountId.includes("discord") ||
+    provider === "discord";
+
+  if (isGroupLike) return null;
+  return "agent:main:main";
+}
+
+function shouldPreventAutomaticDowngrade(candidateModel: string, sessionKey: string): boolean {
+  const normalized = normalizeModelOverrideForProvider(candidateModel).override;
+  return sessionKey === "agent:main:main" && normalized === "gpt-5.2";
+}
+
+function isLongTaskKind(kind: string): boolean {
+  return LONG_TASK_KINDS.has(String(kind ?? "").trim().toLowerCase());
 }
 
 export default function register(api: OpenClawPluginApi) {
@@ -1112,102 +1174,177 @@ export default function register(api: OpenClawPluginApi) {
         const cfg = resolveConfig(api);
         if (!cfg.enabled || !cfg.ruleEngineEnabled || !cfg.switchingEnabled) return;
 
+        pruneExpiredRouteDecisions();
+
         const promptText = String(event.prompt ?? "");
-        const suggestion = await classifyDynamic(api, promptText, undefined);
-
-        // Policy gates (user-confirmed):
-        // - only confidence>=min
-        // - do not switch for simple chat unless explicitly allowed
-        const confRank = (c: string) => (c === "high" ? 3 : c === "medium" ? 2 : 1);
-        if (confRank(suggestion.confidence) < confRank(cfg.switchingMinConfidence)) return;
-        if (!cfg.switchingAllowChat && (suggestion.kind === "quick_simple" || suggestion.kind === "fallback")) return;
-
-        // Fully converged: do not load legacy classification config.
-        const priorityFile = await loadJsonFile<ModelPriorityFile>(cfg.modelPriorityPath);
-        const catalog = await getModelCatalog(api, cfg);
-        const providerAuth = buildProviderAuthMapFromSnapshot(authCache?.value ?? null);
-
-        const picked = pickByPriority({
-          kind: suggestion.kind,
-          catalog,
-          priorityFile,
-          classificationConfig: null,
-          providerAuth,
-        });
-
-        if (!picked.picked) return;
-
         const sessionKey = String((ctx as any)?.sessionKey ?? "unknown");
         const promptHash = crypto.createHash("sha1").update(promptText).digest("hex").slice(0, 16);
+        const agentId = (ctx as any)?.agentId;
 
-        const okToLog = await shouldLogModelOverride({ logDir: cfg.logDir }, sessionKey, picked.picked);
-        if (!okToLog) {
-          // Debug: log dedup skip to prove this path is being hit.
-          try {
-            await appendJsonl(api, {
-              ts: nowIso(),
-              type: "soft_router_suggest",
-              event: "model_override_dedup_skip",
-              pid: process.pid,
-              sessionKey,
-              agentId: (ctx as any)?.agentId,
-              picked: picked.picked,
-              promptHash,
-            });
-          } catch {
-            // ignore
-          }
-          const norm = normalizeModelOverrideForProvider(picked.picked);
-          try {
-            if (norm.normalizedFrom) {
-              console.log(
-                `[soft-router-suggest] model_override_normalized from=${norm.normalizedFrom} to=${norm.override} sessionKey=${sessionKey}`,
-              );
-            }
-          } catch {
-            // ignore
-          }
-          return { modelOverride: norm.override };
+        const decision = routeDecisionBySession.get(sessionKey);
+        if (!decision) {
+          await appendJsonl(api, {
+            ts: nowIso(),
+            type: "soft_router_suggest",
+            event: "route_cache_miss",
+            pid: process.pid,
+            dryRun: true,
+            sessionKey,
+            agentId,
+            promptHash,
+          });
+          return;
         }
 
-        // Actually switch this run's model.
+        if (decision.expiresAtMs <= Date.now()) {
+          routeDecisionBySession.delete(sessionKey);
+          await appendJsonl(api, {
+            ts: nowIso(),
+            type: "soft_router_suggest",
+            event: "route_cache_expired",
+            pid: process.pid,
+            dryRun: true,
+            sessionKey,
+            agentId,
+            promptHash,
+            messageHash: decision.messageHash,
+          });
+          return;
+        }
+
         await appendJsonl(api, {
           ts: nowIso(),
           type: "soft_router_suggest",
-          event: "model_override",
+          event: "route_cache_hit",
           pid: process.pid,
-          dryRun: false,
-          sessionKey: (ctx as any)?.sessionKey,
-          agentId: (ctx as any)?.agentId,
-          kind: suggestion.kind,
-          confidence: suggestion.confidence,
-          picked: picked.picked,
-          note: picked.note,
+          dryRun: true,
+          sessionKey,
+          agentId,
           promptHash,
+          kind: decision.kind,
+          confidence: decision.confidence,
+          candidateModel: decision.candidateModel,
+          messageHash: decision.messageHash,
         });
 
-        // Emit a clear gateway log line for quick verification.
-        // (This is intentionally one-line and stable for grep.)
+        if (sessionKey !== "agent:main:main") {
+          routeDecisionBySession.delete(sessionKey);
+          await appendJsonl(api, {
+            ts: nowIso(),
+            type: "soft_router_suggest",
+            event: "route_override_skipped_non_main_session",
+            pid: process.pid,
+            dryRun: true,
+            sessionKey,
+            agentId,
+            promptHash,
+            kind: decision.kind,
+            confidence: decision.confidence,
+            candidateModel: decision.candidateModel,
+          });
+          return;
+        }
+
+        if (!isLongTaskKind(decision.kind)) {
+          routeDecisionBySession.delete(sessionKey);
+          await appendJsonl(api, {
+            ts: nowIso(),
+            type: "soft_router_suggest",
+            event: "route_override_skipped_non_long_task",
+            pid: process.pid,
+            dryRun: true,
+            sessionKey,
+            agentId,
+            promptHash,
+            kind: decision.kind,
+            confidence: decision.confidence,
+            candidateModel: decision.candidateModel,
+          });
+          return;
+        }
+
+        const confRank = (c: string) => (c === "high" ? 3 : c === "medium" ? 2 : 1);
+        const effectiveMinConfidence = "medium";
+        if (confRank(decision.confidence) < confRank(effectiveMinConfidence)) {
+          routeDecisionBySession.delete(sessionKey);
+          await appendJsonl(api, {
+            ts: nowIso(),
+            type: "soft_router_suggest",
+            event: "route_override_skipped_low_confidence",
+            pid: process.pid,
+            dryRun: true,
+            sessionKey,
+            agentId,
+            promptHash,
+            kind: decision.kind,
+            confidence: decision.confidence,
+            candidateModel: decision.candidateModel,
+            minConfidence: effectiveMinConfidence,
+          });
+          return;
+        }
+
+        if (shouldPreventAutomaticDowngrade(decision.candidateModel, sessionKey)) {
+          routeDecisionBySession.delete(sessionKey);
+          await appendJsonl(api, {
+            ts: nowIso(),
+            type: "soft_router_suggest",
+            event: "route_override_skipped_downgrade_guard",
+            pid: process.pid,
+            dryRun: true,
+            sessionKey,
+            agentId,
+            promptHash,
+            kind: decision.kind,
+            confidence: decision.confidence,
+            candidateModel: decision.candidateModel,
+          });
+          return;
+        }
+
+        const okToLog = await shouldLogModelOverride(
+          { logDir: cfg.logDir },
+          sessionKey,
+          decision.candidateModel,
+        );
+        const norm = normalizeModelOverrideForProvider(decision.candidateModel);
+
+        if (okToLog) {
+          await appendJsonl(api, {
+            ts: nowIso(),
+            type: "soft_router_suggest",
+            event: "route_override_applied",
+            pid: process.pid,
+            dryRun: false,
+            sessionKey,
+            agentId,
+            promptHash,
+            messageHash: decision.messageHash,
+            kind: decision.kind,
+            confidence: decision.confidence,
+            picked: decision.candidateModel,
+            normalizedPicked: norm.override,
+            note: decision.reason,
+          });
+        }
+
+        routeDecisionBySession.delete(sessionKey);
+
         try {
+          if (norm.normalizedFrom) {
+            console.log(
+              `[soft-router-suggest] route_override_normalized from=${norm.normalizedFrom} to=${norm.override} sessionKey=${sessionKey}`,
+            );
+          }
           console.log(
-            `[soft-router-suggest] model_override sessionKey=${sessionKey} agentId=${String(
-              (ctx as any)?.agentId ?? "",
-            )} kind=${suggestion.kind} confidence=${suggestion.confidence} picked=${picked.picked} promptHash=${promptHash}`,
+            `[soft-router-suggest] route_override sessionKey=${sessionKey} agentId=${String(
+              agentId ?? "",
+            )} kind=${decision.kind} confidence=${decision.confidence} picked=${decision.candidateModel} promptHash=${promptHash}`,
           );
         } catch {
           // ignore
         }
 
-        const norm = normalizeModelOverrideForProvider(picked.picked);
-        try {
-          if (norm.normalizedFrom) {
-            console.log(
-              `[soft-router-suggest] model_override_normalized from=${norm.normalizedFrom} to=${norm.override} sessionKey=${sessionKey}`,
-            );
-          }
-        } catch {
-          // ignore
-        }
         return { modelOverride: norm.override };
       } catch {
         return;
@@ -1219,6 +1356,8 @@ export default function register(api: OpenClawPluginApi) {
     "message_received",
     async (event: PluginHookMessageReceivedEvent, ctx: PluginHookMessageContext) => {
       try {
+        pruneExpiredRouteDecisions();
+
         const suggestion = await classifyDynamic(api, event.content, event.metadata);
         const cfg = resolveConfig(api);
 
@@ -1300,6 +1439,53 @@ export default function register(api: OpenClawPluginApi) {
         // Store last suggestion for this conversation (after availability/fallback filled).
         if (ctx.conversationId) {
           lastSuggestionByConversation.set(ctx.conversationId, suggestion);
+        }
+
+        const routeSessionKey = resolveRouteSessionKeyFromMessageContext(ctx, event);
+        const messageMetadata = (event.metadata ?? {}) as Record<string, unknown>;
+        const rawMessageId = messageMetadata.messageId ?? messageMetadata.message_id ?? messageMetadata.id;
+        const messageId = typeof rawMessageId === "string" ? rawMessageId : undefined;
+        const messageHash = crypto
+          .createHash("sha1")
+          .update(String(event.content ?? ""))
+          .digest("hex")
+          .slice(0, 16);
+
+        if (routeSessionKey) {
+          const now = Date.now();
+          routeDecisionBySession.set(routeSessionKey, {
+            sessionKey: routeSessionKey,
+            conversationId: ctx.conversationId,
+            channelId: ctx.channelId,
+            messageId,
+            messageHash,
+            contentPreview: preview(event.content, 120),
+            kind: suggestion.kind,
+            confidence: suggestion.confidence,
+            candidateModel: suggestion.model,
+            reason: suggestion.reason,
+            signals: Array.isArray(suggestion.signals) ? suggestion.signals : [],
+            createdAtMs: now,
+            expiresAtMs: now + ROUTE_DECISION_TTL_MS,
+            source: "message_received",
+          });
+
+          await appendJsonl(api, {
+            ts: nowIso(),
+            type: "soft_router_suggest",
+            event: "route_decision_cached",
+            dryRun: true,
+            sessionKey: routeSessionKey,
+            channelId: ctx.channelId,
+            accountId: ctx.accountId,
+            conversationId: ctx.conversationId,
+            messageId,
+            messageHash,
+            kind: suggestion.kind,
+            confidence: suggestion.confidence,
+            candidateModel: suggestion.model,
+            expiresInMs: ROUTE_DECISION_TTL_MS,
+          });
         }
 
         await appendJsonl(api, {

@@ -116,7 +116,7 @@
       },
       "switchingMinConfidence": {
         "type": "string",
-        "default": "high",
+        "default": "medium",
         "enum": [
           "low",
           "medium",
