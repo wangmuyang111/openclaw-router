@@ -1006,6 +1006,19 @@ function Run-TaskModeKindsMenu {
   }
 }
 
+function Show-TaskModePrimaryModelList($cfg) {
+  $kind = [string]$cfg.taskModePrimaryKind
+  Safe-Clear
+  Write-Host (("=== {0}: {1} ===" -f (T 'taskMode.primaryModels'), (Format-KindLabel $kind))) -ForegroundColor Cyan
+  $list = @(Get-KindModelList $kind)
+  if ($list.Count -le 0) {
+    Write-Host (T 'status.listEmpty') -ForegroundColor Yellow
+  } else {
+    Print-NumberedList $list
+  }
+  Wait-AnyKeyOrEsc
+}
+
 function Run-TaskModeMenu {
   while ($true) {
     $cfg = Load-RuntimeRouting
@@ -1029,6 +1042,7 @@ function Run-TaskModeMenu {
     Write-Host ("2) " + (T 'taskMode.show'))
     Write-Host ("3) " + (T 'taskMode.kinds'))
     Write-Host ("4) " + (T 'taskMode.minConfidence'))
+    Write-Host ("5) " + (T 'taskMode.primaryModels'))
     Write-Host ("6) " + (T 'taskMode.returnToPrimary'))
     Write-Host ("7) " + (T 'taskMode.allowDowngrade'))
     Write-Host ("0) " + (T 'menu.back'))
@@ -1069,6 +1083,7 @@ function Run-TaskModeMenu {
         Write-Host (T 'taskMode.saved') -ForegroundColor Green
         Wait-AnyKeyOrEsc
       }
+      '5' { Show-TaskModePrimaryModelList $cfg }
       '6' {
         $picked = Select-OnOff (T 'taskMode.returnToPrimary') ([bool]$cfg.taskModeReturnToPrimary)
         if ($null -eq $picked) { continue }

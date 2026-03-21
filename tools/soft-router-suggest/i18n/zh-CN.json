@@ -113,6 +113,7 @@
   "taskMode.manage.enable": "启用任务模式对应类属",
   "taskMode.currentDisabledKinds": "当前已禁用任务模式类属",
   "taskMode.minConfidence": "设置最小切换置信度",
+  "taskMode.primaryModels": "当前任务主类对应模型列表",
   "taskMode.returnToPrimary": "处理后返回任务主模型",
   "taskMode.allowDowngrade": "允许自动降级",
   "taskMode.status.on": "当前：已开启",

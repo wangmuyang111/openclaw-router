@@ -113,6 +113,7 @@
   "taskMode.manage.enable": "Enable task-mode kinds",
   "taskMode.currentDisabledKinds": "Currently disabled task-mode kinds",
   "taskMode.minConfidence": "Set minimum switching confidence",
+  "taskMode.primaryModels": "Show primary task-kind model list",
   "taskMode.returnToPrimary": "Return to primary model after temporary work",
   "taskMode.allowDowngrade": "Allow automatic downgrade",
   "taskMode.status.on": "Current: ON",
