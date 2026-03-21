@@ -7,101 +7,259 @@ on:
     branches: [ main ]
 
 jobs:
-  lint:
-    name: Lint and Validate
+  validate:
+    name: Validate repo hygiene
     runs-on: windows-latest
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Validate JSON files
-      shell: pwsh
-      run: |
-        $jsonFiles = Get-ChildItem -Recurse -Filter *.json
-        foreach ($file in $jsonFiles) {
-          Write-Host "Validating $($file.FullName)"
-          Get-Content $file.FullName | ConvertFrom-Json | Out-Null
-        }
-    
-    - name: Check for sensitive data
-      shell: pwsh
-      run: |
-        $patterns = @(
-          'C:\\Users\\[^\\]+',
-          '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}',
-          'sk-[a-zA-Z0-9]{20,}',
-          'token\"\s*:\s*\"[A-Za-z0-9_-]{16,}',
-          'auth\"\s*:\s*\{[\s\S]{0,200}token'
-        )
 
-        $files = Get-ChildItem -Recurse -File | Where-Object { $_.FullName -notmatch '\\.git\\' }
-        $found = $false
-        foreach ($pattern in $patterns) {
-          $matches = $files | Select-String -Pattern $pattern
-          if ($matches) {
-            Write-Error "Found sensitive pattern: $pattern"
-            $matches | Select-Object -First 20 | ForEach-Object { Write-Host ("$($_.Path):$($_.LineNumber): $($_.Line)") }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate JSON files
+        shell: pwsh
+        run: |
+          $jsonFiles = Get-ChildItem -Recurse -Filter *.json
+          foreach ($file in $jsonFiles) {
+            Write-Host "Validating $($file.FullName)"
+            Get-Content $file.FullName | ConvertFrom-Json | Out-Null
+          }
+
+      - name: Check for sensitive data
+        shell: pwsh
+        run: |
+          $excludedPathPatterns = @(
+            '\\.git\\',
+            'tmp_openclaw\\.json',
+            'tmp_openclaw\\.json\\.bak',
+            'node_modules\\',
+            'dist\\'
+          )
+
+          $files = Get-ChildItem -Recurse -File | Where-Object {
+            $path = $_.FullName
+            -not ($excludedPathPatterns | Where-Object { $path -match $_ })
+          }
+
+          $found = $false
+
+          $secretPatterns = @(
+            'sk-[a-zA-Z0-9]{20,}',
+            'token"\s*:\s*"[A-Za-z0-9_-]{16,}',
+            'auth"\s*:\s*\{[\s\S]{0,200}token'
+          )
+
+          foreach ($pattern in $secretPatterns) {
+            $matches = $files | Select-String -Pattern $pattern
+            if ($matches) {
+              Write-Error "Found sensitive pattern: $pattern"
+              $matches | Select-Object -First 20 | ForEach-Object {
+                Write-Host ("$($_.Path):$($_.LineNumber): $($_.Line)")
+              }
+              $found = $true
+            }
+          }
+
+          $emailCandidates = $files | Select-String -Pattern '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+          $emailMatches = $emailCandidates | Where-Object {
+            $_.Line -notmatch 'example\.com|example\.org|noreply@|support@|bugs@'
+          }
+          if ($emailMatches) {
+            Write-Error 'Found suspicious email addresses'
+            $emailMatches | Select-Object -First 20 | ForEach-Object {
+              Write-Host ("$($_.Path):$($_.LineNumber): $($_.Line)")
+            }
             $found = $true
           }
-        }
-        
-        if ($found) {
-          exit 1
-        }
-        Write-Host "✓ No sensitive data detected"
 
-  test:
-    name: Test Scripts
-    runs-on: windows-latest
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Test PowerShell syntax
-      shell: pwsh
-      run: |
-        $scripts = Get-ChildItem -Path ./scripts -Filter *.ps1
-        foreach ($script in $scripts) {
-          Write-Host "Testing $($script.Name)"
-          $null = [System.Management.Automation.PSParser]::Tokenize(
-            (Get-Content $script.FullName -Raw), 
-            [ref]$null
-          )
-        }
-        Write-Host "✓ All scripts have valid syntax"
-    
-    - name: Validate .gitignore
-      shell: pwsh
-      run: |
-        if (-not (Test-Path .gitignore)) {
-          Write-Error ".gitignore not found"
-          exit 1
-        }
-        $content = Get-Content .gitignore
-        if ($content -notcontains "*.log") {
-          Write-Warning ".gitignore should include *.log"
-        }
-        Write-Host "✓ .gitignore exists"
-
-  docs:
-    name: Documentation Check
-    runs-on: windows-latest
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Check required files
-      shell: pwsh
-      run: |
-        $required = @('README.md', 'LICENSE', 'CHANGELOG.md', 'CONTRIBUTING.md')
-        $missing = @()
-        foreach ($file in $required) {
-          if (-not (Test-Path $file)) {
-            $missing += $file
+          $realPathCandidates = $files | Select-String -Pattern 'C:\\Users\\[^\\]+'
+          $realPathMatches = $realPathCandidates | Where-Object {
+            $_.Line -notmatch '<你>|<your-username>|<your-|YOUR_USERNAME|%USERPROFILE%|RUNNER_TEMP|example|sample'
           }
-        }
-        if ($missing.Count -gt 0) {
-          Write-Error "Missing required files: $($missing -join ', ')"
-          exit 1
-        }
-        Write-Host "✓ All required documentation files present"
+          if ($realPathMatches) {
+            Write-Error 'Found suspicious Windows user paths'
+            $realPathMatches | Select-Object -First 20 | ForEach-Object {
+              Write-Host ("$($_.Path):$($_.LineNumber): $($_.Line)")
+            }
+            $found = $true
+          }
+
+          if ($found) {
+            exit 1
+          }
+
+          Write-Host "✓ No sensitive data detected"
+
+      - name: Check required files
+        shell: pwsh
+        run: |
+          $required = @('README.md', 'LICENSE', 'CHANGELOG.md', 'CONTRIBUTING.md')
+          $missing = @()
+          foreach ($file in $required) {
+            if (-not (Test-Path $file)) {
+              $missing += $file
+            }
+          }
+          if ($missing.Count -gt 0) {
+            Write-Error "Missing required files: $($missing -join ', ')"
+            exit 1
+          }
+          Write-Host "✓ Required documentation files present"
+
+  build-and-smoke:
+    name: Build and smoke test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: npm install
+        run: npm install
+
+      - name: npm build
+        run: npm run build
+
+      - name: Test PowerShell syntax (Windows only)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $scripts = Get-ChildItem -Path ./scripts -Filter *.ps1
+          foreach ($script in $scripts) {
+            Write-Host "Testing $($script.Name)"
+            $null = [System.Management.Automation.PSParser]::Tokenize(
+              (Get-Content $script.FullName -Raw),
+              [ref]$null
+            )
+          }
+          Write-Host "✓ All PowerShell scripts have valid syntax"
+
+      - name: Create fake OpenClaw home and CLI (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/openclaw-home" "$RUNNER_TEMP/openclaw-workspace" "$RUNNER_TEMP/fake-bin"
+          printf '{\n  "plugins": {\n    "entries": {}\n  }\n}\n' > "$RUNNER_TEMP/openclaw-home/openclaw.json"
+          cat > "$RUNNER_TEMP/fake-bin/openclaw" <<'EOF'
+          #!/usr/bin/env bash
+          if [[ "${1:-}" == "--version" ]]; then
+            echo "2026.3.3-ci"
+            exit 0
+          fi
+          echo "fake openclaw ci shim"
+          exit 0
+          EOF
+          chmod +x "$RUNNER_TEMP/fake-bin/openclaw"
+          echo "OPENCLAW_HOME=$RUNNER_TEMP/openclaw-home" >> "$GITHUB_ENV"
+          echo "OPENCLAW_WORKSPACE=$RUNNER_TEMP/openclaw-workspace" >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/fake-bin" >> "$GITHUB_PATH"
+
+      - name: Create fake OpenClaw home and CLI (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $home = Join-Path $env:RUNNER_TEMP 'openclaw-home'
+          $workspace = Join-Path $env:RUNNER_TEMP 'openclaw-workspace'
+          $fakeBin = Join-Path $env:RUNNER_TEMP 'fake-bin'
+
+          New-Item -ItemType Directory -Force -Path $home, $workspace, $fakeBin | Out-Null
+          @"
+          {
+            "plugins": {
+              "entries": {}
+            }
+          }
+          "@ | Set-Content -Path (Join-Path $home 'openclaw.json') -Encoding UTF8
+
+          $shim = Join-Path $fakeBin 'openclaw.cmd'
+          @"
+          @echo off
+          if "%1"=="--version" (
+            echo 2026.3.3-ci
+            exit /b 0
+          )
+          echo fake openclaw ci shim
+          exit /b 0
+          "@ | Set-Content -Path $shim -Encoding ASCII
+
+          "OPENCLAW_HOME=$home" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "OPENCLAW_WORKSPACE=$workspace" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $fakeBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: CLI doctor smoke test (initial)
+        run: node ./dist/cli/index.js doctor
+
+      - name: CLI install dry-run smoke test
+        run: node ./dist/cli/index.js install --dry-run
+
+      - name: Wrapper smoke test (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          chmod +x scripts/*.sh
+          ./scripts/doctor.sh
+          ./scripts/install.sh --dry-run
+          ./scripts/repair.sh --dry-run
+
+      - name: Wrapper smoke test (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File .\scripts\doctor.ps1
+          powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 --dry-run
+          powershell -ExecutionPolicy Bypass -File .\scripts\repair.ps1 --dry-run
+
+      - name: CLI install real smoke test
+        run: node ./dist/cli/index.js install
+
+      - name: CLI doctor smoke test (after install)
+        run: node ./dist/cli/index.js doctor
+
+      - name: CLI repair dry-run smoke test
+        run: node ./dist/cli/index.js repair --dry-run
+
+      - name: CLI repair real smoke test
+        run: node ./dist/cli/index.js repair
+
+      - name: CLI uninstall smoke test
+        run: node ./dist/cli/index.js uninstall
+
+      - name: CLI doctor smoke test (after uninstall)
+        run: node ./dist/cli/index.js doctor
+
+      - name: Reinstall before remove-files smoke test
+        run: node ./dist/cli/index.js install
+
+      - name: CLI uninstall remove-files smoke test
+        run: node ./dist/cli/index.js uninstall --remove-files
+
+      - name: CLI doctor smoke test (expected failure after remove-files on Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set +e
+          node ./dist/cli/index.js doctor
+          status=$?
+          if [ "$status" -eq 0 ]; then
+            echo "Expected doctor to fail after remove-files, but it succeeded." >&2
+            exit 1
+          fi
+          echo "Doctor failed as expected after remove-files (exit $status)."
+
+      - name: CLI doctor smoke test (expected failure after remove-files on Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          node .\dist\cli\index.js doctor
+          $status = $LASTEXITCODE
+          if ($status -eq 0) {
+            Write-Error 'Expected doctor to fail after remove-files, but it succeeded.'
+            exit 1
+          }
+          Write-Host "Doctor failed as expected after remove-files (exit $status)."

@@ -14,23 +14,48 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/YOUR_USERNAME/OpenClaw-SoftRouter.git"
+    "url": "git+https://github.com/wangmuyang111/openclaw-router.git"
   },
   "bugs": {
-    "url": "https://github.com/YOUR_USERNAME/OpenClaw-SoftRouter/issues"
+    "url": "https://github.com/wangmuyang111/openclaw-router/issues"
   },
-  "homepage": "https://github.com/YOUR_USERNAME/OpenClaw-SoftRouter#readme",
+  "homepage": "https://github.com/wangmuyang111/openclaw-router#readme",
   "author": "OpenClaw Contributors",
   "license": "MIT",
   "engines": {
     "node": ">=18.0.0"
   },
-  "scripts": {
-    "install": "powershell -ExecutionPolicy Bypass -File ./scripts/install.ps1",
-    "doctor": "powershell -ExecutionPolicy Bypass -File ./scripts/doctor.ps1",
-    "uninstall": "powershell -ExecutionPolicy Bypass -File ./scripts/uninstall.ps1"
+  "bin": {
+    "openclaw-soft-router": "./dist/cli/index.js"
   },
-  "devDependencies": {},
+  "files": [
+    "dist",
+    "plugin",
+    "tools/soft-router-suggest",
+    "scripts",
+    "router-sidecar",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "clean": "rimraf dist",
+    "build": "tsc -p tsconfig.json",
+    "build:cli": "tsc -p tsconfig.json",
+    "windows:doctor": "powershell -ExecutionPolicy Bypass -File ./scripts/doctor.ps1",
+    "windows:install": "powershell -ExecutionPolicy Bypass -File ./scripts/install.ps1",
+    "windows:repair": "powershell -ExecutionPolicy Bypass -File ./scripts/repair.ps1",
+    "windows:uninstall": "powershell -ExecutionPolicy Bypass -File ./scripts/uninstall.ps1",
+    "openclaw:doctor": "node ./dist/cli/index.js doctor",
+    "openclaw:install": "node ./dist/cli/index.js install",
+    "openclaw:repair": "node ./dist/cli/index.js repair",
+    "openclaw:uninstall": "node ./dist/cli/index.js uninstall"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.9.2"
+  },
   "dependencies": {},
   "openclaw": {
     "plugin": true,

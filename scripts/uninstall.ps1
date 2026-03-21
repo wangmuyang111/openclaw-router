@@ -1,11 +1,15 @@
 #requires -Version 5.1
 <#
-Uninstall script for OpenClaw Soft Router Suggest
+Uninstall wrapper for OpenClaw Soft Router Suggest (Windows)
 
-- Disables plugin entry in openclaw.json (backup first)
-- Optionally removes copied extension/tools files
+Current behavior:
+- Prefer the cross-platform Node CLI uninstall flow
+- Auto-build the CLI once if dist\cli\index.js is missing
+- Preserve legacy `-RemoveFiles` PowerShell usage by translating it to `--remove-files`
+- Fall back to the legacy PowerShell uninstall only when forwarding is unavailable and no remove-files flag was requested
 #>
 
+[CmdletBinding()]
 param(
   [switch]$RemoveFiles
 )
@@ -13,74 +17,59 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Get-OpenClawHome {
-  $openclawHome = Join-Path $env:USERPROFILE '.openclaw'
-  return $openclawHome
-}
-function Get-OpenClawWorkspace { Join-Path (Get-OpenClawHome) 'workspace' }
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..') | Select-Object -ExpandProperty Path
+$distCli = Join-Path $repoRoot 'dist\cli\index.js'
+$legacyUninstall = Join-Path $PSScriptRoot 'uninstall.legacy.ps1'
 
-$openclawHome = Get-OpenClawHome
-$workspace = Get-OpenClawWorkspace
-$configPath = Join-Path $openclawHome 'openclaw.json'
+function Invoke-LegacyUninstall {
+  Write-Host "Repo: $repoRoot"
+  Write-Host "Fallback: legacy PowerShell uninstall"
+  Write-Host ""
 
-if (-not (Test-Path -LiteralPath $configPath)) {
-  throw "openclaw.json not found at: $configPath"
-}
-
-$ts = Get-Date -Format 'yyyyMMdd-HHmmss'
-$backupPath = Join-Path $openclawHome ("openclaw.json.bak.soft-router-suggest.uninstall.$ts")
-Copy-Item -Force $configPath $backupPath
-Write-Host "Backup: $backupPath"
-
-$raw = Get-Content -LiteralPath $configPath -Raw
-$cfg = $raw | ConvertFrom-Json
-
-$id = 'soft-router-suggest'
-
-# StrictMode-safe navigation
-$hasPlugins = ($cfg.PSObject.Properties.Name -contains 'plugins')
-$hasEntries = $hasPlugins -and ($cfg.plugins.PSObject.Properties.Name -contains 'entries')
-$hasEntry = $hasEntries -and ($cfg.plugins.entries.PSObject.Properties.Name -contains $id)
-
-if ($hasEntry) {
-  $entry = $cfg.plugins.entries.PSObject.Properties[$id].Value
-  if ($entry -and ($entry.PSObject.Properties.Name -contains 'enabled')) {
-    $entry.enabled = $false
-  } else {
-    # Ensure it's an object and set enabled
-    $cfg.plugins.entries.PSObject.Properties[$id].Value = @{}
-    $cfg.plugins.entries.PSObject.Properties[$id].Value.enabled = $false
-  }
-
-  Write-Host "OK: plugin disabled in openclaw.json"
-} else {
-  Write-Host "Note: plugin entry not found; nothing to disable."
+  & $legacyUninstall @PSBoundParameters
+  exit $LASTEXITCODE
 }
 
-$json = $cfg | ConvertTo-Json -Depth 50
-$json = ($json -replace "`r?`n", "`r`n")
-[System.IO.File]::WriteAllText($configPath, $json, (New-Object System.Text.UTF8Encoding($false)))
-
+$forwardArgs = @('uninstall')
 if ($RemoveFiles) {
-  $extDir = Join-Path $workspace '.openclaw\extensions\soft-router-suggest'
-  $toolsDir = Join-Path $workspace 'tools\soft-router-suggest'
-
-  if (Test-Path -LiteralPath $extDir) { Remove-Item -Recurse -Force -LiteralPath $extDir }
-  $toolFiles = @(
-    'router-rules.json',
-    'model-priority.json',
-    'classification-rules.json',
-    'classification-rules.schema.json',
-    'model-tags.json',
-    'router-config.ps1',
-    'validate-classification.ps1'
-  )
-  foreach ($f in $toolFiles) {
-    $p = Join-Path $toolsDir $f
-    if (Test-Path -LiteralPath $p) { Remove-Item -Force -LiteralPath $p }
-  }
-
-  Write-Host "OK: files removed"
+  $forwardArgs += '--remove-files'
 }
 
-Write-Host "Done."
+$nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+if (-not $nodeCmd) {
+  if ($RemoveFiles) {
+    throw 'Node.js is required to forward uninstall remove-files behavior to the Node CLI.'
+  }
+  Invoke-LegacyUninstall
+}
+
+if (-not (Test-Path -LiteralPath $distCli)) {
+  $npmCmd = Get-Command npm -ErrorAction SilentlyContinue
+  if ($npmCmd) {
+    Write-Host "Build missing: running npm run build..."
+    & $npmCmd.Source run build
+    if ($LASTEXITCODE -ne 0) {
+      if ($RemoveFiles) {
+        throw 'Failed to build CLI; cannot honor uninstall remove-files behavior with legacy fallback.'
+      }
+      Write-Warning 'CLI build failed; falling back to legacy PowerShell uninstall.'
+      Invoke-LegacyUninstall
+    }
+  }
+}
+
+if (-not (Test-Path -LiteralPath $distCli)) {
+  if ($RemoveFiles) {
+    throw "CLI entry not found after build attempt: $distCli"
+  }
+  Write-Warning 'CLI entry missing; falling back to legacy PowerShell uninstall.'
+  Invoke-LegacyUninstall
+}
+
+Write-Host "Repo: $repoRoot"
+Write-Host "Wrapper: forwarding to Node CLI uninstall"
+Write-Host "CLI: $distCli"
+Write-Host ""
+
+& $nodeCmd.Source $distCli @forwardArgs
+exit $LASTEXITCODE

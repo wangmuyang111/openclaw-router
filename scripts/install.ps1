@@ -1,198 +1,64 @@
 #requires -Version 5.1
 <#
-Install script for OpenClaw Soft Router Suggest (Windows + PowerShell)
+Install wrapper for OpenClaw Soft Router Suggest (Windows)
 
-- Copies plugin to OpenClaw extensions
-- Copies tools (router-rules/model-priority) into OpenClaw workspace
-- Adds/updates plugins.entries.soft-router-suggest in openclaw.json (with backup)
-
-Safety:
-- Makes timestamped backup of openclaw.json before modifying
-- Never writes secrets
+Current behavior:
+- Prefer the cross-platform Node CLI install flow
+- Auto-build the CLI once if dist\cli\index.js is missing
+- Fall back to the legacy PowerShell installer only when no CLI flags were requested
 #>
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Get-OpenClawHome {
-  $openclawHome = Join-Path $env:USERPROFILE '.openclaw'
-  return $openclawHome
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..') | Select-Object -ExpandProperty Path
+$distCli = Join-Path $repoRoot 'dist\cli\index.js'
+$legacyInstall = Join-Path $PSScriptRoot 'install.legacy.ps1'
+
+function Invoke-LegacyInstall {
+  Write-Host "Repo: $repoRoot"
+  Write-Host "Fallback: legacy PowerShell install"
+  Write-Host ""
+
+  & $legacyInstall
+  exit $LASTEXITCODE
 }
 
-function Get-OpenClawWorkspace {
-  return (Join-Path (Get-OpenClawHome) 'workspace')
+$nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+if (-not $nodeCmd) {
+  if ($args.Count -gt 0) {
+    throw 'Node.js is required to forward install flags to the Node CLI.'
+  }
+  Invoke-LegacyInstall
 }
 
-function Ensure-Dir([string]$p) {
-  if (-not (Test-Path -LiteralPath $p)) {
-    New-Item -ItemType Directory -Force -Path $p | Out-Null
+if (-not (Test-Path -LiteralPath $distCli)) {
+  $npmCmd = Get-Command npm -ErrorAction SilentlyContinue
+  if ($npmCmd) {
+    Write-Host "Build missing: running npm run build..."
+    & $npmCmd.Source run build
+    if ($LASTEXITCODE -ne 0) {
+      if ($args.Count -gt 0) {
+        throw 'Failed to build CLI; cannot honor install flags with legacy fallback.'
+      }
+      Write-Warning 'CLI build failed; falling back to legacy PowerShell install.'
+      Invoke-LegacyInstall
+    }
   }
 }
 
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..') | Select-Object -ExpandProperty Path
-$openclawHome = Get-OpenClawHome
-$workspace = Get-OpenClawWorkspace
-
-$extDir = Join-Path $workspace '.openclaw\extensions\soft-router-suggest'
-$toolsDir = Join-Path $workspace 'tools\soft-router-suggest'
-
-Ensure-Dir $extDir
-Ensure-Dir $toolsDir
+if (-not (Test-Path -LiteralPath $distCli)) {
+  if ($args.Count -gt 0) {
+    throw "CLI entry not found after build attempt: $distCli"
+  }
+  Write-Warning 'CLI entry missing; falling back to legacy PowerShell install.'
+  Invoke-LegacyInstall
+}
 
 Write-Host "Repo: $repoRoot"
-Write-Host "OpenClaw home: $openclawHome"
-Write-Host "Workspace: $workspace"
+Write-Host "Wrapper: forwarding to Node CLI install"
+Write-Host "CLI: $distCli"
+Write-Host ""
 
-# 1) Copy plugin
-# NOTE: repo may not contain legacy classification files anymore; copy only what exists.
-$pluginFiles = @(
-  'index.ts',
-  'openclaw.plugin.json',
-  'keyword-library.ts',
-  'weighted-routing-engine.ts',
-  'classification-loader.ts',
-  'classification-engine.ts'
-)
-foreach ($f in $pluginFiles) {
-  $src = Join-Path $repoRoot (Join-Path 'plugin' $f)
-  if (Test-Path -LiteralPath $src) {
-    Copy-Item -Force $src (Join-Path $extDir $f)
-  }
-}
-Write-Host "OK: plugin copied -> $extDir"
-
-# 2) Copy tools
-$toolFiles = @(
-  # Legacy (kept for compatibility / tooling)
-  'router-rules.json',
-  'model-priority.json',
-  'classification-rules.json',
-  'classification-rules.schema.json',
-  'model-tags.json',
-  'router-config.ps1',
-  'validate-classification.ps1',
-
-  # NEW (keyword-library routing)
-  'keyword-library.json',
-  'keyword-library.schema.json',
-  'keyword-overrides.user.schema.json',
-  'keyword-overrides.user.example.json',
-  'routing-rules.compiled.json'
-)
-foreach ($f in $toolFiles) {
-  $src = Join-Path $repoRoot (Join-Path 'tools\soft-router-suggest' $f)
-  if (Test-Path -LiteralPath $src) {
-    Copy-Item -Force $src (Join-Path $toolsDir $f)
-  }
-}
-
-# Ensure user overrides file exists (copy example only if missing).
-$overridesDst = Join-Path $toolsDir 'keyword-overrides.user.json'
-$overridesExample = Join-Path $repoRoot 'tools\soft-router-suggest\keyword-overrides.user.example.json'
-if (-not (Test-Path -LiteralPath $overridesDst)) {
-  if (Test-Path -LiteralPath $overridesExample) {
-    Copy-Item -Force $overridesExample $overridesDst
-    Write-Host "OK: created keyword-overrides.user.json from example"
-  }
-}
-
-Write-Host "OK: tools copied -> $toolsDir"
-
-# 3) Patch openclaw.json (backup first)
-$configPath = Join-Path $openclawHome 'openclaw.json'
-if (-not (Test-Path -LiteralPath $configPath)) {
-  throw "openclaw.json not found at: $configPath"
-}
-
-$ts = Get-Date -Format 'yyyyMMdd-HHmmss'
-$backupPath = Join-Path $openclawHome ("openclaw.json.bak.soft-router-suggest.$ts")
-Copy-Item -Force $configPath $backupPath
-Write-Host "Backup: $backupPath"
-
-# Read JSON (PowerShell 5.1 friendly)
-$raw = Get-Content -LiteralPath $configPath -Raw
-$cfg = $raw | ConvertFrom-Json
-
-# StrictMode-safe property creation
-if (-not ($cfg.PSObject.Properties.Name -contains 'plugins')) {
-  $cfg | Add-Member -NotePropertyName plugins -NotePropertyValue (@{})
-}
-if (-not ($cfg.plugins.PSObject.Properties.Name -contains 'entries')) {
-  $cfg.plugins | Add-Member -NotePropertyName entries -NotePropertyValue (@{})
-}
-
-$id = 'soft-router-suggest'
-
-# StrictMode-safe dynamic property access
-$hasEntry = ($cfg.plugins.entries.PSObject.Properties.Name -contains $id)
-if (-not $hasEntry) {
-  $cfg.plugins.entries | Add-Member -NotePropertyName $id -NotePropertyValue (@{})
-}
-$entry = $cfg.plugins.entries.PSObject.Properties[$id].Value
-
-# Ensure entry is an object
-if ($null -eq $entry -or -not ($entry -is [psobject])) {
-  $cfg.plugins.entries.PSObject.Properties[$id].Value = @{}
-  $entry = $cfg.plugins.entries.PSObject.Properties[$id].Value
-}
-
-# Enabled by default; config is minimal and contains no absolute paths.
-if ($null -eq $entry.PSObject.Properties['enabled']) {
-  $entry | Add-Member -NotePropertyName enabled -NotePropertyValue $true
-} else {
-  $entry.enabled = $true
-}
-
-# Ensure config exists and is a PSCustomObject (not Hashtable)
-if ($null -eq $entry.PSObject.Properties['config']) {
-  $entry | Add-Member -NotePropertyName config -NotePropertyValue ([pscustomobject]@{})
-} else {
-  $cfgProp = $entry.PSObject.Properties['config']
-  $c = $cfgProp.Value
-  if ($c -is [System.Collections.IDictionary]) {
-    $cfgProp.Value = [pscustomobject]$c
-  } elseif ($null -eq $c -or -not ($c -is [psobject])) {
-    $cfgProp.Value = [pscustomobject]@{}
-  }
-}
-
-function Set-ConfigValue($cfgObj, [string]$name, $value) {
-  if ($cfgObj -is [System.Collections.IDictionary]) {
-    $cfgObj[$name] = $value
-    return
-  }
-  $p = $cfgObj.PSObject.Properties[$name]
-  if ($null -eq $p) {
-    $cfgObj | Add-Member -NotePropertyName $name -NotePropertyValue $value
-  } else {
-    $p.Value = $value
-  }
-}
-
-# Default to RULES mode after install (portable, low-latency)
-# NOTE: these are optional fields; we set them explicitly to avoid confusing "blank" status output.
-Set-ConfigValue $entry.config 'ruleEngineEnabled' $true
-Set-ConfigValue $entry.config 'routerLlmEnabled' $false
-# IMPORTANT: keep switching disabled by default; plugin runs in suggest/log-only mode.
-Set-ConfigValue $entry.config 'switchingEnabled' $false
-
-# Safety default: never auto-switch chat kind
-if ($null -eq $entry.config.PSObject.Properties['switchingAllowChat']) {
-  $entry.config | Add-Member -NotePropertyName switchingAllowChat -NotePropertyValue $false
-}
-
-# OPTIONAL: allow overriding openclaw CLI path via config, default is 'openclaw'
-if ($null -eq $entry.config.PSObject.Properties['openclawCliPath']) {
-  $entry.config | Add-Member -NotePropertyName openclawCliPath -NotePropertyValue 'openclaw'
-}
-
-# Write back (UTF-8)
-$json = $cfg | ConvertTo-Json -Depth 50
-# Normalize to CRLF for Notepad friendliness
-$json = ($json -replace "`r?`n", "`r`n")
-[System.IO.File]::WriteAllText($configPath, $json, (New-Object System.Text.UTF8Encoding($false)))
-Write-Host "OK: openclaw.json updated (plugin enabled)"
-
-Write-Host "\nNext steps:"
-Write-Host "  - Use scripts\\router.ps1 for mode switching (FAST/RULES/LLM)"
-Write-Host "  - Start sidecar: scripts\\sidecar-start.ps1"
+& $nodeCmd.Source $distCli install @args
+exit $LASTEXITCODE
