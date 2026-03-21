@@ -1,0 +1,11 @@
+{
+  "taskModeEnabled": true,
+  "taskModePrimaryKind": "coding",
+  "taskModeKinds": [
+    "coding"
+  ],
+  "taskModeMinConfidence": "medium",
+  "taskModeReturnToPrimary": true,
+  "taskModeAllowAutoDowngrade": false,
+  "freeSwitchWhenTaskModeOff": true
+}

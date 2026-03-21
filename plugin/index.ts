@@ -60,6 +60,14 @@ type PluginConfig = {
   catalogCmdTimeoutMs?: number;
   setupPromptEnabled?: boolean;
   setupPromptMaxModels?: number;
+
+  taskModeEnabled?: boolean;
+  taskModePrimaryKind?: string;
+  taskModeKinds?: string[];
+  taskModeMinConfidence?: "low" | "medium" | "high";
+  taskModeReturnToPrimary?: boolean;
+  taskModeAllowAutoDowngrade?: boolean;
+  freeSwitchWhenTaskModeOff?: boolean;
 };
 
 // Runtime path resolution helpers
@@ -113,6 +121,14 @@ const DEFAULTS = {
   catalogCmdTimeoutMs: 20_000,
   setupPromptEnabled: true,
   setupPromptMaxModels: 3,
+
+  taskModeEnabled: true,
+  taskModePrimaryKind: "coding",
+  taskModeKinds: ["coding"],
+  taskModeMinConfidence: "medium" as const,
+  taskModeReturnToPrimary: true,
+  taskModeAllowAutoDowngrade: false,
+  freeSwitchWhenTaskModeOff: true,
 } as const;
 
 function clampInt(value: unknown, min: number, max: number, fallback: number) {
@@ -238,6 +254,40 @@ function resolveConfig(api: OpenClawPluginApi): Required<typeof DEFAULTS> {
     DEFAULTS.setupPromptMaxModels,
   );
 
+  const taskModeEnabled =
+    typeof cfg.taskModeEnabled === "boolean" ? cfg.taskModeEnabled : DEFAULTS.taskModeEnabled;
+  const taskModePrimaryKind =
+    typeof cfg.taskModePrimaryKind === "string" && cfg.taskModePrimaryKind.trim()
+      ? cfg.taskModePrimaryKind.trim()
+      : DEFAULTS.taskModePrimaryKind;
+  const taskModeKinds = Array.isArray(cfg.taskModeKinds)
+    ? Array.from(
+        new Set(
+          cfg.taskModeKinds
+            .map((value) => String(value ?? "").trim())
+            .filter((value) => value.length > 0),
+        ),
+      )
+    : DEFAULTS.taskModeKinds;
+  const taskModeMinConfidence =
+    cfg.taskModeMinConfidence === "low" ||
+    cfg.taskModeMinConfidence === "medium" ||
+    cfg.taskModeMinConfidence === "high"
+      ? cfg.taskModeMinConfidence
+      : DEFAULTS.taskModeMinConfidence;
+  const taskModeReturnToPrimary =
+    typeof cfg.taskModeReturnToPrimary === "boolean"
+      ? cfg.taskModeReturnToPrimary
+      : DEFAULTS.taskModeReturnToPrimary;
+  const taskModeAllowAutoDowngrade =
+    typeof cfg.taskModeAllowAutoDowngrade === "boolean"
+      ? cfg.taskModeAllowAutoDowngrade
+      : DEFAULTS.taskModeAllowAutoDowngrade;
+  const freeSwitchWhenTaskModeOff =
+    typeof cfg.freeSwitchWhenTaskModeOff === "boolean"
+      ? cfg.freeSwitchWhenTaskModeOff
+      : DEFAULTS.freeSwitchWhenTaskModeOff;
+
   return {
     enabled,
     logDir,
@@ -268,6 +318,13 @@ function resolveConfig(api: OpenClawPluginApi): Required<typeof DEFAULTS> {
     catalogCmdTimeoutMs,
     setupPromptEnabled,
     setupPromptMaxModels,
+    taskModeEnabled,
+    taskModePrimaryKind,
+    taskModeKinds,
+    taskModeMinConfidence,
+    taskModeReturnToPrimary,
+    taskModeAllowAutoDowngrade,
+    freeSwitchWhenTaskModeOff,
   };
 }
 
@@ -992,6 +1049,26 @@ type RouteDecision = {
   source: "message_received";
 };
 
+type RuntimeRoutingConfig = {
+  taskModeEnabled: boolean;
+  taskModePrimaryKind: string;
+  taskModeKinds: string[];
+  taskModeMinConfidence: Confidence;
+  taskModeReturnToPrimary: boolean;
+  taskModeAllowAutoDowngrade: boolean;
+  freeSwitchWhenTaskModeOff: boolean;
+};
+
+type TaskSessionState = {
+  sessionKey: string;
+  primaryKind: string;
+  primaryModel: string;
+  temporaryKind?: string;
+  temporaryModel?: string;
+  lastTaskAt: number;
+  lastRouteAt: number;
+};
+
 async function appendJsonl(api: OpenClawPluginApi, obj: unknown) {
   const cfg = resolveConfig(api);
   if (!cfg.enabled) return;
@@ -1039,8 +1116,11 @@ async function appendJsonl(api: OpenClawPluginApi, obj: unknown) {
 // Dedup map (in-memory, per process).
 const recentOverrides = new Map<string, number>();
 const routeDecisionBySession = new Map<string, RouteDecision>();
+const taskSessionStateBySession = new Map<string, TaskSessionState>();
 const ROUTE_DECISION_TTL_MS = 90_000;
+const RUNTIME_ROUTING_TTL_MS = 5_000;
 const LONG_TASK_KINDS = new Set(["strategy", "coding", "vision"]);
+let runtimeRoutingCache: { value: RuntimeRoutingConfig; expiresAtMs: number } | null = null;
 
 async function shouldLogModelOverride(
   cfg: { logDir: string },
@@ -1077,6 +1157,82 @@ async function shouldLogModelOverride(
   return true;
 }
 
+function getRuntimeRoutingPath(): string {
+  return path.join(getDefaultToolsDir(), "runtime-routing.json");
+}
+
+function getDefaultRuntimeRoutingConfig(cfg: ReturnType<typeof resolveConfig>): RuntimeRoutingConfig {
+  const taskKinds = Array.from(
+    new Set([cfg.taskModePrimaryKind, ...(cfg.taskModeKinds ?? [])].filter((value) => String(value ?? "").trim())),
+  );
+  return {
+    taskModeEnabled: cfg.taskModeEnabled,
+    taskModePrimaryKind: cfg.taskModePrimaryKind,
+    taskModeKinds: taskKinds.length > 0 ? taskKinds : [DEFAULTS.taskModePrimaryKind],
+    taskModeMinConfidence: cfg.taskModeMinConfidence,
+    taskModeReturnToPrimary: cfg.taskModeReturnToPrimary,
+    taskModeAllowAutoDowngrade: cfg.taskModeAllowAutoDowngrade,
+    freeSwitchWhenTaskModeOff: cfg.freeSwitchWhenTaskModeOff,
+  };
+}
+
+async function getRuntimeRoutingConfig(api: OpenClawPluginApi): Promise<RuntimeRoutingConfig> {
+  const now = Date.now();
+  if (runtimeRoutingCache && runtimeRoutingCache.expiresAtMs > now) {
+    return runtimeRoutingCache.value;
+  }
+
+  const cfg = resolveConfig(api);
+  const defaults = getDefaultRuntimeRoutingConfig(cfg);
+  const runtimePath = getRuntimeRoutingPath();
+  const raw = await loadJsonFile<Record<string, unknown>>(runtimePath);
+
+  const taskModePrimaryKind =
+    typeof raw?.taskModePrimaryKind === "string" && raw.taskModePrimaryKind.trim()
+      ? raw.taskModePrimaryKind.trim()
+      : defaults.taskModePrimaryKind;
+  const taskModeKinds = Array.isArray(raw?.taskModeKinds)
+    ? Array.from(
+        new Set(
+          raw.taskModeKinds
+            .map((value) => String(value ?? "").trim())
+            .filter((value) => value.length > 0),
+        ),
+      )
+    : defaults.taskModeKinds;
+
+  const value: RuntimeRoutingConfig = {
+    taskModeEnabled:
+      typeof raw?.taskModeEnabled === "boolean" ? raw.taskModeEnabled : defaults.taskModeEnabled,
+    taskModePrimaryKind,
+    taskModeKinds:
+      taskModeKinds.length > 0
+        ? Array.from(new Set([taskModePrimaryKind, ...taskModeKinds]))
+        : defaults.taskModeKinds,
+    taskModeMinConfidence:
+      raw?.taskModeMinConfidence === "low" ||
+      raw?.taskModeMinConfidence === "medium" ||
+      raw?.taskModeMinConfidence === "high"
+        ? raw.taskModeMinConfidence
+        : defaults.taskModeMinConfidence,
+    taskModeReturnToPrimary:
+      typeof raw?.taskModeReturnToPrimary === "boolean"
+        ? raw.taskModeReturnToPrimary
+        : defaults.taskModeReturnToPrimary,
+    taskModeAllowAutoDowngrade:
+      typeof raw?.taskModeAllowAutoDowngrade === "boolean"
+        ? raw.taskModeAllowAutoDowngrade
+        : defaults.taskModeAllowAutoDowngrade,
+    freeSwitchWhenTaskModeOff:
+      typeof raw?.freeSwitchWhenTaskModeOff === "boolean"
+        ? raw.freeSwitchWhenTaskModeOff
+        : defaults.freeSwitchWhenTaskModeOff,
+  };
+
+  runtimeRoutingCache = { value, expiresAtMs: now + RUNTIME_ROUTING_TTL_MS };
+  return value;
+}
+
 function pruneExpiredRouteDecisions(now = Date.now()) {
   for (const [key, value] of routeDecisionBySession.entries()) {
     if (!value || value.expiresAtMs <= now) {
@@ -1085,38 +1241,72 @@ function pruneExpiredRouteDecisions(now = Date.now()) {
   }
 }
 
+function confidenceRank(c: string): number {
+  return c === "high" ? 3 : c === "medium" ? 2 : 1;
+}
+
 function resolveRouteSessionKeyFromMessageContext(
   ctx: PluginHookMessageContext,
   event: PluginHookMessageReceivedEvent,
 ): string | null {
+  const ctxAny = ctx as any;
   const metadata = (event.metadata ?? {}) as Record<string, unknown>;
-  const chatType = String(metadata.chat_type ?? metadata.chatType ?? "").toLowerCase();
-  const provider = String(metadata.provider ?? "").toLowerCase();
-  const channelId = String(ctx.channelId ?? "").toLowerCase();
-  const accountId = String(ctx.accountId ?? "").toLowerCase();
-  const from = String(event.from ?? "").toLowerCase();
+  const candidates = [
+    ctxAny?.sessionKey,
+    metadata.sessionKey,
+    metadata.session_key,
+    metadata.threadId,
+    metadata.thread_id,
+    metadata.conversationId,
+    metadata.conversation_id,
+    ctx.conversationId,
+    metadata.chatId,
+    metadata.chat_id,
+  ];
 
-  const isGroupLike =
-    chatType === "group" ||
-    chatType === "channel" ||
-    from.includes(":group:") ||
-    from.includes(":channel:") ||
-    from.endsWith("@g.us") ||
-    channelId.includes("discord") ||
-    accountId.includes("discord") ||
-    provider === "discord";
+  for (const value of candidates) {
+    const text = String(value ?? "").trim();
+    if (text) return text;
+  }
 
-  if (isGroupLike) return null;
-  return "agent:main:main";
+  const provider = String(metadata.provider ?? ctx.channelId ?? "unknown").trim() || "unknown";
+  const accountId = String(ctx.accountId ?? metadata.accountId ?? metadata.account_id ?? "unknown").trim() || "unknown";
+  const from = String(event.from ?? metadata.from ?? "unknown").trim() || "unknown";
+  return `fallback:${provider}:${accountId}:${from}`;
 }
 
-function shouldPreventAutomaticDowngrade(candidateModel: string, sessionKey: string): boolean {
-  const normalized = normalizeModelOverrideForProvider(candidateModel).override;
-  return sessionKey === "agent:main:main" && normalized === "gpt-5.2";
+function shouldPreventAutomaticDowngrade(candidateModel: string, allowAutoDowngrade: boolean): boolean {
+  if (allowAutoDowngrade) return false;
+  const normalized = normalizeModelOverrideForProvider(candidateModel).override.toLowerCase();
+  return normalized.includes("gpt-5.2");
 }
 
 function isLongTaskKind(kind: string): boolean {
   return LONG_TASK_KINDS.has(String(kind ?? "").trim().toLowerCase());
+}
+
+function isTaskModeKind(kind: string, runtimeCfg: RuntimeRoutingConfig): boolean {
+  const normalized = String(kind ?? "").trim().toLowerCase();
+  return runtimeCfg.taskModeKinds.some((value) => value.toLowerCase() === normalized);
+}
+
+function getTaskPrimaryModelForSession(
+  runtimeCfg: RuntimeRoutingConfig,
+  decision: RouteDecision,
+  existing?: TaskSessionState,
+): { primaryKind: string; primaryModel: string } {
+  if (existing?.primaryKind && existing?.primaryModel) {
+    return { primaryKind: existing.primaryKind, primaryModel: existing.primaryModel };
+  }
+
+  if (isTaskModeKind(decision.kind, runtimeCfg) && decision.candidateModel) {
+    return { primaryKind: decision.kind, primaryModel: decision.candidateModel };
+  }
+
+  return {
+    primaryKind: runtimeCfg.taskModePrimaryKind,
+    primaryModel: decision.candidateModel,
+  };
 }
 
 export default function register(api: OpenClawPluginApi) {
@@ -1180,6 +1370,7 @@ export default function register(api: OpenClawPluginApi) {
         const sessionKey = String((ctx as any)?.sessionKey ?? "unknown");
         const promptHash = crypto.createHash("sha1").update(promptText).digest("hex").slice(0, 16);
         const agentId = (ctx as any)?.agentId;
+        const runtimeCfg = await getRuntimeRoutingConfig(api);
 
         const decision = routeDecisionBySession.get(sessionKey);
         if (!decision) {
@@ -1227,104 +1418,200 @@ export default function register(api: OpenClawPluginApi) {
           messageHash: decision.messageHash,
         });
 
-        if (sessionKey !== "agent:main:main") {
-          routeDecisionBySession.delete(sessionKey);
-          await appendJsonl(api, {
-            ts: nowIso(),
-            type: "soft_router_suggest",
-            event: "route_override_skipped_non_main_session",
-            pid: process.pid,
-            dryRun: true,
+        let targetModel = decision.candidateModel;
+        let targetKind = decision.kind;
+        let logEvent = "route_override_applied";
+        let logNote = decision.reason;
+        const existingTaskState = taskSessionStateBySession.get(sessionKey);
+
+        if (runtimeCfg.taskModeEnabled) {
+          const primary = getTaskPrimaryModelForSession(runtimeCfg, decision, existingTaskState);
+          let nextTaskState: TaskSessionState = existingTaskState ?? {
             sessionKey,
-            agentId,
-            promptHash,
-            kind: decision.kind,
-            confidence: decision.confidence,
-            candidateModel: decision.candidateModel,
-          });
-          return;
+            primaryKind: primary.primaryKind,
+            primaryModel: primary.primaryModel,
+            lastTaskAt: Date.now(),
+            lastRouteAt: Date.now(),
+          };
+
+          if (!existingTaskState) {
+            taskSessionStateBySession.set(sessionKey, nextTaskState);
+            await appendJsonl(api, {
+              ts: nowIso(),
+              type: "soft_router_suggest",
+              event: "task_mode_primary_set",
+              dryRun: true,
+              sessionKey,
+              agentId,
+              primaryKind: nextTaskState.primaryKind,
+              primaryModel: nextTaskState.primaryModel,
+              sourceKind: decision.kind,
+              sourceModel: decision.candidateModel,
+            });
+          }
+
+          const qualifiesAsTask =
+            isTaskModeKind(decision.kind, runtimeCfg) &&
+            confidenceRank(decision.confidence) >= confidenceRank(runtimeCfg.taskModeMinConfidence);
+
+          if (qualifiesAsTask) {
+            nextTaskState = {
+              ...nextTaskState,
+              primaryKind: nextTaskState.primaryKind || decision.kind,
+              primaryModel: nextTaskState.primaryModel || decision.candidateModel,
+              temporaryKind: decision.kind !== nextTaskState.primaryKind ? decision.kind : undefined,
+              temporaryModel: decision.kind !== nextTaskState.primaryKind ? decision.candidateModel : undefined,
+              lastTaskAt: Date.now(),
+              lastRouteAt: Date.now(),
+            };
+
+            if (
+              shouldPreventAutomaticDowngrade(
+                decision.candidateModel,
+                runtimeCfg.taskModeAllowAutoDowngrade,
+              )
+            ) {
+              routeDecisionBySession.delete(sessionKey);
+              taskSessionStateBySession.set(sessionKey, nextTaskState);
+              await appendJsonl(api, {
+                ts: nowIso(),
+                type: "soft_router_suggest",
+                event: "task_mode_downgrade_blocked",
+                pid: process.pid,
+                dryRun: true,
+                sessionKey,
+                agentId,
+                promptHash,
+                kind: decision.kind,
+                confidence: decision.confidence,
+                candidateModel: decision.candidateModel,
+                primaryModel: nextTaskState.primaryModel,
+              });
+              return;
+            }
+
+            if (nextTaskState.temporaryModel && nextTaskState.temporaryModel !== nextTaskState.primaryModel) {
+              targetModel = nextTaskState.temporaryModel;
+              targetKind = nextTaskState.temporaryKind ?? decision.kind;
+              logEvent = "task_mode_temp_override_applied";
+              logNote = `task mode temporary override from ${nextTaskState.primaryKind} to ${targetKind}`;
+            } else {
+              targetModel = nextTaskState.primaryModel;
+              targetKind = nextTaskState.primaryKind;
+              logEvent = "route_override_applied";
+              logNote = decision.reason;
+            }
+
+            taskSessionStateBySession.set(sessionKey, nextTaskState);
+          } else {
+            const hasTemporaryModel = Boolean(existingTaskState?.temporaryModel);
+            if (runtimeCfg.taskModeReturnToPrimary && existingTaskState?.primaryModel) {
+              targetModel = existingTaskState.primaryModel;
+              targetKind = existingTaskState.primaryKind;
+              logEvent = hasTemporaryModel ? "task_mode_return_to_primary" : "route_override_applied";
+              logNote = hasTemporaryModel
+                ? `task mode return to primary ${existingTaskState.primaryKind}`
+                : `task mode keep primary ${existingTaskState.primaryKind}`;
+              taskSessionStateBySession.set(sessionKey, {
+                ...existingTaskState,
+                temporaryKind: undefined,
+                temporaryModel: undefined,
+                lastRouteAt: Date.now(),
+              });
+            } else if (!runtimeCfg.freeSwitchWhenTaskModeOff) {
+              routeDecisionBySession.delete(sessionKey);
+              await appendJsonl(api, {
+                ts: nowIso(),
+                type: "soft_router_suggest",
+                event: "route_override_skipped_non_long_task",
+                pid: process.pid,
+                dryRun: true,
+                sessionKey,
+                agentId,
+                promptHash,
+                kind: decision.kind,
+                confidence: decision.confidence,
+                candidateModel: decision.candidateModel,
+              });
+              return;
+            }
+          }
+        } else {
+          if (!isLongTaskKind(decision.kind)) {
+            routeDecisionBySession.delete(sessionKey);
+            await appendJsonl(api, {
+              ts: nowIso(),
+              type: "soft_router_suggest",
+              event: "route_override_skipped_non_long_task",
+              pid: process.pid,
+              dryRun: true,
+              sessionKey,
+              agentId,
+              promptHash,
+              kind: decision.kind,
+              confidence: decision.confidence,
+              candidateModel: decision.candidateModel,
+            });
+            return;
+          }
+
+          if (confidenceRank(decision.confidence) < confidenceRank("medium")) {
+            routeDecisionBySession.delete(sessionKey);
+            await appendJsonl(api, {
+              ts: nowIso(),
+              type: "soft_router_suggest",
+              event: "route_override_skipped_low_confidence",
+              pid: process.pid,
+              dryRun: true,
+              sessionKey,
+              agentId,
+              promptHash,
+              kind: decision.kind,
+              confidence: decision.confidence,
+              candidateModel: decision.candidateModel,
+              minConfidence: "medium",
+            });
+            return;
+          }
+
+          if (shouldPreventAutomaticDowngrade(decision.candidateModel, false)) {
+            routeDecisionBySession.delete(sessionKey);
+            await appendJsonl(api, {
+              ts: nowIso(),
+              type: "soft_router_suggest",
+              event: "route_override_skipped_downgrade_guard",
+              pid: process.pid,
+              dryRun: true,
+              sessionKey,
+              agentId,
+              promptHash,
+              kind: decision.kind,
+              confidence: decision.confidence,
+              candidateModel: decision.candidateModel,
+            });
+            return;
+          }
         }
 
-        if (!isLongTaskKind(decision.kind)) {
-          routeDecisionBySession.delete(sessionKey);
-          await appendJsonl(api, {
-            ts: nowIso(),
-            type: "soft_router_suggest",
-            event: "route_override_skipped_non_long_task",
-            pid: process.pid,
-            dryRun: true,
-            sessionKey,
-            agentId,
-            promptHash,
-            kind: decision.kind,
-            confidence: decision.confidence,
-            candidateModel: decision.candidateModel,
-          });
-          return;
-        }
-
-        const confRank = (c: string) => (c === "high" ? 3 : c === "medium" ? 2 : 1);
-        const effectiveMinConfidence = "medium";
-        if (confRank(decision.confidence) < confRank(effectiveMinConfidence)) {
-          routeDecisionBySession.delete(sessionKey);
-          await appendJsonl(api, {
-            ts: nowIso(),
-            type: "soft_router_suggest",
-            event: "route_override_skipped_low_confidence",
-            pid: process.pid,
-            dryRun: true,
-            sessionKey,
-            agentId,
-            promptHash,
-            kind: decision.kind,
-            confidence: decision.confidence,
-            candidateModel: decision.candidateModel,
-            minConfidence: effectiveMinConfidence,
-          });
-          return;
-        }
-
-        if (shouldPreventAutomaticDowngrade(decision.candidateModel, sessionKey)) {
-          routeDecisionBySession.delete(sessionKey);
-          await appendJsonl(api, {
-            ts: nowIso(),
-            type: "soft_router_suggest",
-            event: "route_override_skipped_downgrade_guard",
-            pid: process.pid,
-            dryRun: true,
-            sessionKey,
-            agentId,
-            promptHash,
-            kind: decision.kind,
-            confidence: decision.confidence,
-            candidateModel: decision.candidateModel,
-          });
-          return;
-        }
-
-        const okToLog = await shouldLogModelOverride(
-          { logDir: cfg.logDir },
-          sessionKey,
-          decision.candidateModel,
-        );
-        const norm = normalizeModelOverrideForProvider(decision.candidateModel);
+        const okToLog = await shouldLogModelOverride({ logDir: cfg.logDir }, sessionKey, targetModel);
+        const norm = normalizeModelOverrideForProvider(targetModel);
 
         if (okToLog) {
           await appendJsonl(api, {
             ts: nowIso(),
             type: "soft_router_suggest",
-            event: "route_override_applied",
+            event: logEvent,
             pid: process.pid,
             dryRun: false,
             sessionKey,
             agentId,
             promptHash,
             messageHash: decision.messageHash,
-            kind: decision.kind,
+            kind: targetKind,
             confidence: decision.confidence,
-            picked: decision.candidateModel,
+            picked: targetModel,
             normalizedPicked: norm.override,
-            note: decision.reason,
+            note: logNote,
           });
         }
 
@@ -1339,7 +1626,7 @@ export default function register(api: OpenClawPluginApi) {
           console.log(
             `[soft-router-suggest] route_override sessionKey=${sessionKey} agentId=${String(
               agentId ?? "",
-            )} kind=${decision.kind} confidence=${decision.confidence} picked=${decision.candidateModel} promptHash=${promptHash}`,
+            )} kind=${targetKind} confidence=${decision.confidence} picked=${targetModel} promptHash=${promptHash}`,
           );
         } catch {
           // ignore
@@ -1442,6 +1729,7 @@ export default function register(api: OpenClawPluginApi) {
         }
 
         const routeSessionKey = resolveRouteSessionKeyFromMessageContext(ctx, event);
+        const runtimeCfg = await getRuntimeRoutingConfig(api);
         const messageMetadata = (event.metadata ?? {}) as Record<string, unknown>;
         const rawMessageId = messageMetadata.messageId ?? messageMetadata.message_id ?? messageMetadata.id;
         const messageId = typeof rawMessageId === "string" ? rawMessageId : undefined;
@@ -1485,6 +1773,10 @@ export default function register(api: OpenClawPluginApi) {
             confidence: suggestion.confidence,
             candidateModel: suggestion.model,
             expiresInMs: ROUTE_DECISION_TTL_MS,
+            taskModeEnabled: runtimeCfg.taskModeEnabled,
+            taskModePrimaryKind: runtimeCfg.taskModePrimaryKind,
+            taskModeKinds: runtimeCfg.taskModeKinds,
+            taskModeMinConfidence: runtimeCfg.taskModeMinConfidence,
           });
         }
 

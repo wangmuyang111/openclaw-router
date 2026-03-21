@@ -11,6 +11,7 @@ $setModelsScript = Join-Path $toolsDir 'set-kind-models.ps1'
 $overridesScript = Join-Path $toolsDir 'manage-overrides.ps1'
 $previewScript = Join-Path $toolsDir 'route-preview.ps1'
 $libraryPath = Join-Path $toolsDir 'keyword-library.json'
+$runtimeRoutingPath = Join-Path $toolsDir 'runtime-routing.json'
 $settingsPath = Join-Path $toolsDir 'ui.settings.json'
 $i18nDir = Join-Path $toolsDir 'i18n'
 $zhPath = Join-Path $i18nDir 'zh-CN.json'
@@ -29,6 +30,55 @@ function Load-JsonFile([string]$path) {
 
 function Save-JsonFile([string]$path, $obj) {
   ($obj | ConvertTo-Json -Depth 20) | Set-Content -Path $path -Encoding UTF8
+}
+
+function Get-DefaultRuntimeRouting {
+  return [ordered]@{
+    taskModeEnabled = $true
+    taskModePrimaryKind = 'coding'
+    taskModeKinds = @('coding')
+    taskModeMinConfidence = 'medium'
+    taskModeReturnToPrimary = $true
+    taskModeAllowAutoDowngrade = $false
+    freeSwitchWhenTaskModeOff = $true
+  }
+}
+
+function Load-RuntimeRouting {
+  $defaults = Get-DefaultRuntimeRouting
+  $raw = Load-JsonFile $runtimeRoutingPath
+  if ($null -eq $raw) {
+    return [pscustomobject]$defaults
+  }
+
+  $taskKinds = @()
+  if ($raw.PSObject.Properties.Name -contains 'taskModeKinds' -and $null -ne $raw.taskModeKinds) {
+    foreach ($item in @($raw.taskModeKinds)) {
+      $text = [string]$item
+      if (-not [string]::IsNullOrWhiteSpace($text)) { $taskKinds += $text.Trim() }
+    }
+  }
+
+  $primaryKind = [string]$defaults.taskModePrimaryKind
+  if ($raw.PSObject.Properties.Name -contains 'taskModePrimaryKind' -and -not [string]::IsNullOrWhiteSpace([string]$raw.taskModePrimaryKind)) {
+    $primaryKind = ([string]$raw.taskModePrimaryKind).Trim()
+  }
+  if ($taskKinds -notcontains $primaryKind) { $taskKinds = @($primaryKind) + @($taskKinds) }
+  $taskKinds = @($taskKinds | Select-Object -Unique)
+
+  return [pscustomobject][ordered]@{
+    taskModeEnabled = if ($raw.PSObject.Properties.Name -contains 'taskModeEnabled') { [bool]$raw.taskModeEnabled } else { [bool]$defaults.taskModeEnabled }
+    taskModePrimaryKind = $primaryKind
+    taskModeKinds = if ($taskKinds.Count -gt 0) { $taskKinds } else { @($defaults.taskModeKinds) }
+    taskModeMinConfidence = if (@('low','medium','high') -contains ([string]$raw.taskModeMinConfidence).ToLowerInvariant()) { ([string]$raw.taskModeMinConfidence).ToLowerInvariant() } else { [string]$defaults.taskModeMinConfidence }
+    taskModeReturnToPrimary = if ($raw.PSObject.Properties.Name -contains 'taskModeReturnToPrimary') { [bool]$raw.taskModeReturnToPrimary } else { [bool]$defaults.taskModeReturnToPrimary }
+    taskModeAllowAutoDowngrade = if ($raw.PSObject.Properties.Name -contains 'taskModeAllowAutoDowngrade') { [bool]$raw.taskModeAllowAutoDowngrade } else { [bool]$defaults.taskModeAllowAutoDowngrade }
+    freeSwitchWhenTaskModeOff = if ($raw.PSObject.Properties.Name -contains 'freeSwitchWhenTaskModeOff') { [bool]$raw.freeSwitchWhenTaskModeOff } else { [bool]$defaults.freeSwitchWhenTaskModeOff }
+  }
+}
+
+function Save-RuntimeRouting($cfg) {
+  Save-JsonFile $runtimeRoutingPath $cfg
 }
 
 $script:LangZh = Load-JsonFile $zhPath
@@ -818,6 +868,122 @@ function Run-Preview {
   Wait-AnyKeyOrEsc
 }
 
+function Run-TaskModeMenu {
+  while ($true) {
+    $cfg = Load-RuntimeRouting
+    Safe-Clear
+    Write-Host (("=== {0} ===" -f (T 'taskMode.title'))) -ForegroundColor Cyan
+    if ($cfg.taskModeEnabled) {
+      Write-Host (T 'taskMode.status.on') -ForegroundColor Green
+    } else {
+      Write-Host (T 'taskMode.status.off') -ForegroundColor Yellow
+    }
+    Write-Host (("{0}: {1}" -f (T 'taskMode.currentPrimaryKind'), (Format-KindLabel ([string]$cfg.taskModePrimaryKind)))) -ForegroundColor DarkGray
+    Write-Host (("{0}: {1}" -f (T 'taskMode.currentKinds'), ((@($cfg.taskModeKinds) | ForEach-Object { Format-KindLabel ([string]$_) }) -join ', '))) -ForegroundColor DarkGray
+    Write-Host (("{0}: {1}" -f (T 'taskMode.currentMinConfidence'), [string]$cfg.taskModeMinConfidence)) -ForegroundColor DarkGray
+    Write-Host (("{0}: {1}" -f (T 'taskMode.currentReturnToPrimary'), [string]$cfg.taskModeReturnToPrimary)) -ForegroundColor DarkGray
+    Write-Host (("{0}: {1}" -f (T 'taskMode.currentAllowDowngrade'), [string]$cfg.taskModeAllowAutoDowngrade)) -ForegroundColor DarkGray
+    Write-Host
+    Write-Host ("1) " + (T 'taskMode.toggle'))
+    Write-Host ("2) " + (T 'taskMode.show'))
+    Write-Host ("3) " + (T 'taskMode.primaryKind'))
+    Write-Host ("4) " + (T 'taskMode.kinds'))
+    Write-Host ("5) " + (T 'taskMode.minConfidence'))
+    Write-Host ("6) " + (T 'taskMode.returnToPrimary'))
+    Write-Host ("7) " + (T 'taskMode.allowDowngrade'))
+    Write-Host ("0) " + (T 'menu.back'))
+    Write-Host ((T 'menu.tipPickNumber')) -ForegroundColor DarkGray
+
+    $choice = Read-ChoiceOrEsc (Tf 'prompt.chooseMenu' @(7))
+    if ($null -eq $choice -or $choice -eq '0') { break }
+
+    switch ($choice) {
+      '1' {
+        $cfg.taskModeEnabled = -not [bool]$cfg.taskModeEnabled
+        Save-RuntimeRouting $cfg
+        Write-Host (T 'taskMode.saved') -ForegroundColor Green
+        Wait-AnyKeyOrEsc
+      }
+      '2' {
+        Write-Host (T 'taskMode.currentConfig') -ForegroundColor Cyan
+        $cfg | ConvertTo-Json -Depth 10 | Write-Host
+        Wait-AnyKeyOrEsc
+      }
+      '3' {
+        $kinds = @(List-Kinds)
+        Print-NumberedList $kinds -Kinds
+        $pick = Read-ChoiceOrEsc (Tf 'prompt.chooseKind' @($kinds.Count))
+        if ($null -eq $pick -or $pick -eq '0') { continue }
+        $n = 0
+        if (-not [int]::TryParse($pick, [ref]$n)) { continue }
+        if ($n -lt 1 -or $n -gt $kinds.Count) { continue }
+        $cfg.taskModePrimaryKind = $kinds[$n - 1]
+        $existingKinds = @($cfg.taskModeKinds)
+        if ($existingKinds -notcontains $cfg.taskModePrimaryKind) {
+          $cfg.taskModeKinds = @($cfg.taskModePrimaryKind) + $existingKinds
+        }
+        $cfg.taskModeKinds = @($cfg.taskModeKinds | Select-Object -Unique)
+        Save-RuntimeRouting $cfg
+        Write-Host (T 'taskMode.saved') -ForegroundColor Green
+        Wait-AnyKeyOrEsc
+      }
+      '4' {
+        $kinds = @(List-Kinds)
+        Write-Host (T 'taskMode.manageKindsTip') -ForegroundColor DarkGray
+        Print-NumberedList $kinds -Kinds
+        $sel = Read-InputOrEsc (Tf 'prompt.chooseKind' @($kinds.Count)) -AllowEmpty
+        if ($null -eq $sel -or $sel -eq '0') { continue }
+        $idxs = Parse-IndexList $sel $kinds.Count
+        $set = New-Object System.Collections.Generic.HashSet[string] ([System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($item in @($cfg.taskModeKinds)) { [void]$set.Add([string]$item) }
+        foreach ($ii in $idxs) {
+          $kind = $kinds[$ii]
+          if ($set.Contains($kind)) {
+            if ($kind -ne [string]$cfg.taskModePrimaryKind) { [void]$set.Remove($kind) }
+          } else {
+            [void]$set.Add($kind)
+          }
+        }
+        [void]$set.Add([string]$cfg.taskModePrimaryKind)
+        $cfg.taskModeKinds = @($set | Sort-Object)
+        Save-RuntimeRouting $cfg
+        Write-Host (T 'taskMode.kindsUpdated') -ForegroundColor Green
+        Wait-AnyKeyOrEsc
+      }
+      '5' {
+        Write-Host (T 'taskMode.pickConfidence') -ForegroundColor Cyan
+        Write-Host '1) low'
+        Write-Host '2) medium'
+        Write-Host '3) high'
+        Write-Host ("0) " + (T 'menu.back'))
+        $pick = Read-ChoiceOrEsc (Tf 'prompt.chooseMenu' @(3))
+        if ($null -eq $pick -or $pick -eq '0') { continue }
+        switch ($pick) {
+          '1' { $cfg.taskModeMinConfidence = 'low' }
+          '2' { $cfg.taskModeMinConfidence = 'medium' }
+          '3' { $cfg.taskModeMinConfidence = 'high' }
+          default { continue }
+        }
+        Save-RuntimeRouting $cfg
+        Write-Host (T 'taskMode.saved') -ForegroundColor Green
+        Wait-AnyKeyOrEsc
+      }
+      '6' {
+        $cfg.taskModeReturnToPrimary = -not [bool]$cfg.taskModeReturnToPrimary
+        Save-RuntimeRouting $cfg
+        Write-Host (T 'taskMode.saved') -ForegroundColor Green
+        Wait-AnyKeyOrEsc
+      }
+      '7' {
+        $cfg.taskModeAllowAutoDowngrade = -not [bool]$cfg.taskModeAllowAutoDowngrade
+        Save-RuntimeRouting $cfg
+        Write-Host (T 'taskMode.saved') -ForegroundColor Green
+        Wait-AnyKeyOrEsc
+      }
+    }
+  }
+}
+
 function Run-LanguageMenu {
   while ($true) {
     Safe-Clear
@@ -856,11 +1022,12 @@ while ($true) {
   Write-Host ("4) " + (T 'menu.kindModels'))
   Write-Host ("5) " + (T 'menu.keywords'))
   Write-Host ("6) " + (T 'menu.preview'))
-  Write-Host ("7) " + (T 'menu.language'))
+  Write-Host ("7) " + (T 'menu.taskMode'))
+  Write-Host ("8) " + (T 'menu.language'))
   Write-Host ("0) " + (T 'menu.exit'))
 
   Write-Host ((T 'menu.tipEsc')) -ForegroundColor DarkGray
-  $choice = Read-ChoiceOrEsc (Tf 'prompt.chooseMenu' @(7))
+  $choice = Read-ChoiceOrEsc (Tf 'prompt.chooseMenu' @(8))
   if ($null -eq $choice) { continue }
   try {
     switch ($choice) {
@@ -947,7 +1114,8 @@ while ($true) {
       '4' { Run-Models }
       '5' { Run-Keywords }
       '6' { Run-Preview }
-      '7' { Run-LanguageMenu }
+      '7' { Run-TaskModeMenu }
+      '8' { Run-LanguageMenu }
       '0' { exit 0 }
       default { Write-Host (T 'menu.invalidChoice') -ForegroundColor Yellow; Wait-AnyKeyOrEsc }
     }

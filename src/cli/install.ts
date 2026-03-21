@@ -55,6 +55,13 @@ function patchOpenClawConfig(rawJson: string): string {
   config.switchingEnabled = false;
   config.switchingAllowChat = false;
   config.openclawCliPath = "openclaw";
+  config.taskModeEnabled = true;
+  config.taskModePrimaryKind = "coding";
+  config.taskModeKinds = ["coding"];
+  config.taskModeMinConfidence = "medium";
+  config.taskModeReturnToPrimary = true;
+  config.taskModeAllowAutoDowngrade = false;
+  config.freeSwitchWhenTaskModeOff = true;
   entry.config = config;
 
   entries["soft-router-suggest"] = entry;
@@ -62,6 +69,22 @@ function patchOpenClawConfig(rawJson: string): string {
   root.plugins = plugins;
 
   return `${JSON.stringify(root, null, 2)}\n`;
+}
+
+function getDefaultRuntimeRoutingJson(): string {
+  return `${JSON.stringify(
+    {
+      taskModeEnabled: true,
+      taskModePrimaryKind: "coding",
+      taskModeKinds: ["coding"],
+      taskModeMinConfidence: "medium",
+      taskModeReturnToPrimary: true,
+      taskModeAllowAutoDowngrade: false,
+      freeSwitchWhenTaskModeOff: true,
+    },
+    null,
+    2,
+  )}\n`;
 }
 
 async function copyToolDirectoryContents(sourceDir: string, destinationDir: string): Promise<void> {
@@ -145,6 +168,8 @@ export async function runInstall(options: InstallOptions): Promise<number> {
   const overridesExists = await pathExists(overridesDst);
   const overridesExample = path.join(paths.repoToolsDir, "keyword-overrides.user.example.json");
   const overridesExampleExists = await pathExists(overridesExample);
+  const runtimeRoutingPath = path.join(paths.workspaceToolsDir, "runtime-routing.json");
+  const runtimeRoutingExists = await pathExists(runtimeRoutingPath);
 
   if (options.dryRun) {
     console.log("DRY RUN: no files will be changed.");
@@ -183,6 +208,10 @@ export async function runInstall(options: InstallOptions): Promise<number> {
   if (!overridesExists && overridesExampleExists) {
     await copyFile(overridesExample, overridesDst);
     console.log("OK: created keyword-overrides.user.json from example");
+  }
+  if (!runtimeRoutingExists) {
+    await writeFile(runtimeRoutingPath, getDefaultRuntimeRoutingJson(), "utf8");
+    console.log("OK: created runtime-routing.json with task mode defaults");
   }
   console.log(`OK: tools copied -> ${paths.workspaceToolsDir}`);
 

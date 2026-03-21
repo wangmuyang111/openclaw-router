@@ -185,6 +185,51 @@
         "maximum": 20,
         "description": "Max missing-tag models to mention in the setup prompt footer."
       },
+      "taskModeEnabled": {
+        "type": "boolean",
+        "default": true,
+        "description": "Default task mode switch. Runtime menu settings in runtime-routing.json take precedence at execution time."
+      },
+      "taskModePrimaryKind": {
+        "type": "string",
+        "default": "coding",
+        "description": "Default primary task kind used as the anchor kind for task mode. Runtime menu settings may override this."
+      },
+      "taskModeKinds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "default": [
+          "coding"
+        ],
+        "description": "Default task-mode kinds eligible for stable task routing. Runtime menu settings may override this."
+      },
+      "taskModeMinConfidence": {
+        "type": "string",
+        "default": "medium",
+        "enum": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "description": "Minimum confidence required before task mode may temporarily switch models. Runtime menu settings may override this."
+      },
+      "taskModeReturnToPrimary": {
+        "type": "boolean",
+        "default": true,
+        "description": "When true, task mode returns to the per-session primary model after temporary routing scenarios end."
+      },
+      "taskModeAllowAutoDowngrade": {
+        "type": "boolean",
+        "default": false,
+        "description": "When false, task mode blocks automatic downgrade-style overrides from displacing the primary task model."
+      },
+      "freeSwitchWhenTaskModeOff": {
+        "type": "boolean",
+        "default": true,
+        "description": "When task mode is disabled, allow freer switching behavior under the existing routing rules."
+      },
       "routerLlmEnabled": {
         "type": "boolean",
         "default": false,

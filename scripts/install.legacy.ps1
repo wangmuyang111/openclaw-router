@@ -87,6 +87,22 @@ if (-not (Test-Path -LiteralPath $overridesDst)) {
   }
 }
 
+$runtimeRoutingPath = Join-Path $toolsDir 'runtime-routing.json'
+if (-not (Test-Path -LiteralPath $runtimeRoutingPath)) {
+  $runtimeJson = @{
+    taskModeEnabled = $true
+    taskModePrimaryKind = 'coding'
+    taskModeKinds = @('coding')
+    taskModeMinConfidence = 'medium'
+    taskModeReturnToPrimary = $true
+    taskModeAllowAutoDowngrade = $false
+    freeSwitchWhenTaskModeOff = $true
+  } | ConvertTo-Json -Depth 10
+  $runtimeJson = ($runtimeJson -replace "`r?`n", "`r`n")
+  [System.IO.File]::WriteAllText($runtimeRoutingPath, $runtimeJson, (New-Object System.Text.UTF8Encoding($false)))
+  Write-Host "OK: created runtime-routing.json with task mode defaults"
+}
+
 Write-Host "OK: tools copied -> $toolsDir"
 
 # 3) Patch openclaw.json (backup first)
