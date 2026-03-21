@@ -21,7 +21,7 @@
     },
     "keywordSets": {
       "type": "object",
-      "description": "Named keyword sets. Keys like planning.strong, coding.negative.",
+      "description": "Named keyword sets. Keys like strategy.strong, coding.negative, support.weak.",
       "additionalProperties": {
         "type": "array",
         "items": { "type": "string" }

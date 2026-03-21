@@ -15,12 +15,15 @@ if ([string]::IsNullOrWhiteSpace($OverridesPath)) {
 
 function Parse-PastedLines($text) {
   if ([string]::IsNullOrWhiteSpace($text)) { return @() }
-  $lines = $text -split "`n"
+  $normalized = $text -replace "`r`n?", "`n"
+  $lines = $normalized -split "`n"
   $out = @()
   foreach ($line in $lines) {
     $line = $line.Trim()
+    if (-not $line) { continue }
     if ($line.StartsWith("#")) { continue }
-    $parts = $line -split ","
+    $line = $line -replace '[，、/]+', ','
+    $parts = $line -split '\s*,\s*'
     foreach ($p in $parts) {
       $p = $p.Trim()
       if ($p) { $out += $p }
@@ -69,6 +72,9 @@ switch ($Action) {
     }
 
     $props = $sets.PSObject.Properties | Where-Object { $_.MemberType -eq 'NoteProperty' }
+    if ($SetId) {
+      $props = @($props | Where-Object { $_.Name -eq $SetId })
+    }
     if ($props.Count -eq 0) {
       Write-Host "No overrides configured."
       break
@@ -83,6 +89,9 @@ switch ($Action) {
       }
       if ($sdata.remove -and $sdata.remove.Count -gt 0) {
         Write-Host "  - Remove: $($sdata.remove -join ', ')"
+      }
+      if ((-not $sdata.add -or $sdata.add.Count -eq 0) -and (-not $sdata.remove -or $sdata.remove.Count -eq 0)) {
+        Write-Host "  (empty)"
       }
     }
   }
@@ -102,7 +111,7 @@ switch ($Action) {
   }
 
   'add' {
-    if (-not $SetId) { throw "--SetId is required (e.g. planning.strong)" }
+    if (-not $SetId) { throw "--SetId is required (e.g. strategy.strong)" }
     if (-not $PastedText) { throw "Please provide --PastedText" }
     
     $items = Parse-PastedLines $PastedText
@@ -120,7 +129,7 @@ switch ($Action) {
   }
 
   'remove' {
-    if (-not $SetId) { throw "--SetId is required (e.g. planning.strong)" }
+    if (-not $SetId) { throw "--SetId is required (e.g. strategy.strong)" }
     if (-not $PastedText) { throw "Please provide --PastedText" }
     
     $items = Parse-PastedLines $PastedText

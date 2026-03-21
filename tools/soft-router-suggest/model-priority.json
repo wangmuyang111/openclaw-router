@@ -2,24 +2,32 @@
   "$schema": "soft-router-suggest:model-priority:v2",
   "version": 2,
   "updatedAt": "2026-02-12T03:07:20.067Z",
-  "notes": "Reordered to prioritize always-available models and reduce unavailable-delay risk.",
+  "notes": "Simplified 6-kind priorities. strategy receives higher-grade models.",
   "kinds": {
-    "complex_planning": [
-      "local-proxy/gpt-5.2"
+    "strategy": [
+      "local-proxy/gpt-5.2",
+      "local-proxy/gpt-5.4"
     ],
     "coding": [
-      "local-proxy/gpt-5.2"
+      "local-proxy/gpt-5.2",
+      "local-proxy/gpt-5.3-codex",
+      "local-proxy/gpt-5.2-codex",
+      "local-proxy/gpt-5.4"
     ],
     "vision": [
-      "local-proxy/gpt-5.2"
+      "local-proxy/gpt-5.2",
+      "local-proxy/vision-model",
+      "local-proxy/gpt-5.4"
     ],
-    "quick_simple": [
-      "local-proxy/gpt-5.2"
+    "support": [
+      "local-proxy/gpt-5.2",
+      "local-proxy/gpt-5.4"
     ],
-    "text_writing": [
-      "local-proxy/gpt-5.2"
+    "general": [
+      "local-proxy/gpt-5.2",
+      "local-proxy/gpt-5.4"
     ],
-    "fallback": [
+    "chat": [
       "local-proxy/gpt-5.2"
     ]
   }

@@ -4,7 +4,7 @@
   "updatedAt": "2026-03-19T04:28:00.000Z",
   "notes": "Example user overrides. Copy to keyword-overrides.user.json to take effect. Use ONLY paste input in UI; one term per line. Lines starting with # are comments.",
   "sets": {
-    "planning.strong": {
+    "strategy.strong": {
       "add": [
         "排期方案",
         "项目蓝图"
@@ -22,7 +22,11 @@
     }
   },
   "kinds": {
-    "planning": { "enabled": true },
-    "chat": { "enabled": true }
+    "strategy": {
+      "enabled": true
+    },
+    "chat": {
+      "enabled": true
+    }
   }
 }

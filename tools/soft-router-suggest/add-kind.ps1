@@ -21,8 +21,8 @@ function Save-Library($lib) {
 }
 
 function Assert-KindId($k) {
-  if ($k -notmatch '^[a-z][a-z0-9_]*$') {
-    throw "Invalid kind id '$k'. Use lowercase letters, digits, underscore; must start with a letter."
+  if ($k -notmatch '^[\p{L}][\p{L}\p{N}_]*$') {
+    throw "Invalid kind id '$k'. Allowed: English or Chinese characters, digits, underscore; must start with a letter/汉字. Examples: finance_ai, 财务助手"
   }
   if ($k -eq 'chat') {
     throw "Kind id 'chat' is reserved (fallback kind). Choose another name."
