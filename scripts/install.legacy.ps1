@@ -93,6 +93,7 @@ if (-not (Test-Path -LiteralPath $runtimeRoutingPath)) {
     taskModeEnabled = $true
     taskModePrimaryKind = 'coding'
     taskModeKinds = @('coding')
+    taskModeDisabledKinds = @()
     taskModeMinConfidence = 'medium'
     taskModeReturnToPrimary = $true
     taskModeAllowAutoDowngrade = $false

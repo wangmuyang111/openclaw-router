@@ -37,6 +37,7 @@ function Get-DefaultRuntimeRouting {
     taskModeEnabled = $true
     taskModePrimaryKind = 'coding'
     taskModeKinds = @('coding')
+    taskModeDisabledKinds = @()
     taskModeMinConfidence = 'medium'
     taskModeReturnToPrimary = $true
     taskModeAllowAutoDowngrade = $false
@@ -66,10 +67,20 @@ function Load-RuntimeRouting {
   if ($taskKinds -notcontains $primaryKind) { $taskKinds = @($primaryKind) + @($taskKinds) }
   $taskKinds = @($taskKinds | Select-Object -Unique)
 
+  $disabledKinds = @()
+  if ($raw.PSObject.Properties.Name -contains 'taskModeDisabledKinds' -and $null -ne $raw.taskModeDisabledKinds) {
+    foreach ($item in @($raw.taskModeDisabledKinds)) {
+      $text = [string]$item
+      if (-not [string]::IsNullOrWhiteSpace($text) -and $text.Trim() -ne $primaryKind) { $disabledKinds += $text.Trim() }
+    }
+    $disabledKinds = @($disabledKinds | Select-Object -Unique)
+  }
+
   return [pscustomobject][ordered]@{
     taskModeEnabled = if ($raw.PSObject.Properties.Name -contains 'taskModeEnabled') { [bool]$raw.taskModeEnabled } else { [bool]$defaults.taskModeEnabled }
     taskModePrimaryKind = $primaryKind
     taskModeKinds = if ($taskKinds.Count -gt 0) { $taskKinds } else { @($defaults.taskModeKinds) }
+    taskModeDisabledKinds = $disabledKinds
     taskModeMinConfidence = if (@('low','medium','high') -contains ([string]$raw.taskModeMinConfidence).ToLowerInvariant()) { ([string]$raw.taskModeMinConfidence).ToLowerInvariant() } else { [string]$defaults.taskModeMinConfidence }
     taskModeReturnToPrimary = if ($raw.PSObject.Properties.Name -contains 'taskModeReturnToPrimary') { [bool]$raw.taskModeReturnToPrimary } else { [bool]$defaults.taskModeReturnToPrimary }
     taskModeAllowAutoDowngrade = if ($raw.PSObject.Properties.Name -contains 'taskModeAllowAutoDowngrade') { [bool]$raw.taskModeAllowAutoDowngrade } else { [bool]$defaults.taskModeAllowAutoDowngrade }
@@ -78,6 +89,13 @@ function Load-RuntimeRouting {
 }
 
 function Save-RuntimeRouting($cfg) {
+  if ($null -eq $cfg.taskModeKinds) { $cfg | Add-Member -NotePropertyName taskModeKinds -NotePropertyValue @('coding') -Force }
+  if ($null -eq $cfg.taskModeDisabledKinds) { $cfg | Add-Member -NotePropertyName taskModeDisabledKinds -NotePropertyValue @() -Force }
+  $cfg.taskModeKinds = @(@($cfg.taskModeKinds) | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ } | Select-Object -Unique)
+  $cfg.taskModeDisabledKinds = @(@($cfg.taskModeDisabledKinds) | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ -and $_ -ne [string]$cfg.taskModePrimaryKind } | Select-Object -Unique)
+  if ($cfg.taskModeKinds -notcontains [string]$cfg.taskModePrimaryKind) {
+    $cfg.taskModeKinds = @([string]$cfg.taskModePrimaryKind) + @($cfg.taskModeKinds)
+  }
   Save-JsonFile $runtimeRoutingPath $cfg
 }
 
@@ -868,6 +886,126 @@ function Run-Preview {
   Wait-AnyKeyOrEsc
 }
 
+function Select-OnOff([string]$title, [bool]$currentValue) {
+  while ($true) {
+    Safe-Clear
+    Write-Host (("=== {0} ===" -f $title)) -ForegroundColor Cyan
+    Write-Host (("1) {0}" -f (T 'taskMode.enable')))
+    Write-Host (("2) {0}" -f (T 'taskMode.disable')))
+    Write-Host (("0) {0}" -f (T 'menu.back')))
+    $pick = Read-ChoiceOrEsc (Tf 'prompt.chooseMenu' @(2))
+    if ($null -eq $pick -or $pick -eq '0') { return $null }
+    switch ($pick) {
+      '1' { return $true }
+      '2' { return $false }
+      default { }
+    }
+  }
+}
+
+function Show-TaskModeKinds($cfg) {
+  Write-Host (T 'taskMode.enabledKindsOnly') -ForegroundColor Cyan
+  $enabledKinds = @($cfg.taskModeKinds | Where-Object { @($cfg.taskModeDisabledKinds) -notcontains $_ })
+  if ($enabledKinds.Count -gt 0) {
+    foreach ($kind in $enabledKinds) { Write-Host ("- " + (Format-KindLabel ([string]$kind))) }
+  } else {
+    Write-Host (T 'status.listEmpty') -ForegroundColor DarkGray
+  }
+  Write-Host
+  Write-Host (("{0}: {1}" -f (T 'taskMode.currentDisabledKinds'), ((@($cfg.taskModeDisabledKinds) | ForEach-Object { Format-KindLabel ([string]$_) }) -join ', '))) -ForegroundColor DarkGray
+}
+
+function Run-TaskModeKindsMenu {
+  while ($true) {
+    $cfg = Load-RuntimeRouting
+    $allKinds = @(List-Kinds)
+    Safe-Clear
+    Write-Host (("=== {0} ===" -f (T 'taskMode.manageMenu'))) -ForegroundColor Cyan
+    Show-TaskModeKinds $cfg
+    Write-Host
+    Write-Host (("1) {0}" -f (T 'taskMode.primaryKind')))
+    Write-Host (("2) {0}" -f (T 'taskMode.manage.addRemove')))
+    Write-Host (("3) {0}" -f (T 'taskMode.manage.disable')))
+    Write-Host (("4) {0}" -f (T 'taskMode.manage.enable')))
+    Write-Host (("0) {0}" -f (T 'menu.back')))
+    $choice = Read-ChoiceOrEsc (Tf 'prompt.chooseMenu' @(4))
+    if ($null -eq $choice -or $choice -eq '0') { break }
+
+    switch ($choice) {
+      '1' {
+        Print-NumberedList $allKinds -Kinds
+        $pick = Read-ChoiceOrEsc (Tf 'prompt.chooseKind' @($allKinds.Count))
+        if ($null -eq $pick -or $pick -eq '0') { continue }
+        $n = 0
+        if (-not [int]::TryParse($pick, [ref]$n)) { continue }
+        if ($n -lt 1 -or $n -gt $allKinds.Count) { continue }
+        $cfg.taskModePrimaryKind = $allKinds[$n - 1]
+        if (@($cfg.taskModeKinds) -notcontains $cfg.taskModePrimaryKind) {
+          $cfg.taskModeKinds = @($cfg.taskModePrimaryKind) + @($cfg.taskModeKinds)
+        }
+        $cfg.taskModeDisabledKinds = @(@($cfg.taskModeDisabledKinds) | Where-Object { $_ -ne [string]$cfg.taskModePrimaryKind })
+        Save-RuntimeRouting $cfg
+        Write-Host (T 'taskMode.saved') -ForegroundColor Green
+        Wait-AnyKeyOrEsc
+      }
+      '2' {
+        Write-Host (T 'taskMode.manageKindsTip') -ForegroundColor DarkGray
+        Print-NumberedList $allKinds -Kinds
+        $sel = Read-InputOrEsc (Tf 'prompt.chooseKind' @($allKinds.Count)) -AllowEmpty
+        if ($null -eq $sel -or $sel -eq '0') { continue }
+        $idxs = Parse-IndexList $sel $allKinds.Count
+        $set = New-Object System.Collections.Generic.HashSet[string] ([System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($item in @($cfg.taskModeKinds)) { [void]$set.Add([string]$item) }
+        foreach ($ii in $idxs) {
+          $kind = $allKinds[$ii]
+          if ($set.Contains($kind)) {
+            if ($kind -ne [string]$cfg.taskModePrimaryKind) {
+              [void]$set.Remove($kind)
+              $cfg.taskModeDisabledKinds = @(@($cfg.taskModeDisabledKinds) | Where-Object { $_ -ne $kind })
+            }
+          } else {
+            [void]$set.Add($kind)
+          }
+        }
+        [void]$set.Add([string]$cfg.taskModePrimaryKind)
+        $cfg.taskModeKinds = @($set | Sort-Object)
+        Save-RuntimeRouting $cfg
+        Write-Host (T 'taskMode.kindsUpdated') -ForegroundColor Green
+        Wait-AnyKeyOrEsc
+      }
+      '3' {
+        $enabledKinds = @(@($cfg.taskModeKinds) | Where-Object { $_ -ne [string]$cfg.taskModePrimaryKind -and @($cfg.taskModeDisabledKinds) -notcontains $_ })
+        if ($enabledKinds.Count -le 0) { Write-Host (T 'status.listEmpty') -ForegroundColor Yellow; Wait-AnyKeyOrEsc; continue }
+        Print-NumberedList $enabledKinds -Kinds
+        $sel = Read-InputOrEsc (Tf 'prompt.chooseKind' @($enabledKinds.Count)) -AllowEmpty
+        if ($null -eq $sel -or $sel -eq '0') { continue }
+        $idxs = Parse-IndexList $sel $enabledKinds.Count
+        $disabled = New-Object System.Collections.Generic.HashSet[string] ([System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($item in @($cfg.taskModeDisabledKinds)) { [void]$disabled.Add([string]$item) }
+        foreach ($ii in $idxs) { [void]$disabled.Add([string]$enabledKinds[$ii]) }
+        $cfg.taskModeDisabledKinds = @($disabled | Sort-Object)
+        Save-RuntimeRouting $cfg
+        Write-Host (T 'taskMode.saved') -ForegroundColor Green
+        Wait-AnyKeyOrEsc
+      }
+      '4' {
+        $disabledKinds = @($cfg.taskModeDisabledKinds)
+        if ($disabledKinds.Count -le 0) { Write-Host (T 'status.listEmpty') -ForegroundColor Yellow; Wait-AnyKeyOrEsc; continue }
+        Print-NumberedList $disabledKinds -Kinds
+        $sel = Read-InputOrEsc (Tf 'prompt.chooseKind' @($disabledKinds.Count)) -AllowEmpty
+        if ($null -eq $sel -or $sel -eq '0') { continue }
+        $idxs = Parse-IndexList $sel $disabledKinds.Count
+        $remove = New-Object System.Collections.Generic.HashSet[string] ([System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($ii in $idxs) { [void]$remove.Add([string]$disabledKinds[$ii]) }
+        $cfg.taskModeDisabledKinds = @(@($cfg.taskModeDisabledKinds) | Where-Object { -not $remove.Contains([string]$_) })
+        Save-RuntimeRouting $cfg
+        Write-Host (T 'taskMode.saved') -ForegroundColor Green
+        Wait-AnyKeyOrEsc
+      }
+    }
+  }
+}
+
 function Run-TaskModeMenu {
   while ($true) {
     $cfg = Load-RuntimeRouting
@@ -880,15 +1018,17 @@ function Run-TaskModeMenu {
     }
     Write-Host (("{0}: {1}" -f (T 'taskMode.currentPrimaryKind'), (Format-KindLabel ([string]$cfg.taskModePrimaryKind)))) -ForegroundColor DarkGray
     Write-Host (("{0}: {1}" -f (T 'taskMode.currentKinds'), ((@($cfg.taskModeKinds) | ForEach-Object { Format-KindLabel ([string]$_) }) -join ', '))) -ForegroundColor DarkGray
+    Write-Host (("{0}: {1}" -f (T 'taskMode.currentDisabledKinds'), ((@($cfg.taskModeDisabledKinds) | ForEach-Object { Format-KindLabel ([string]$_) }) -join ', '))) -ForegroundColor DarkGray
+    $returnLabel = if ([bool]$cfg.taskModeReturnToPrimary) { T 'taskMode.status.on' } else { T 'taskMode.status.off' }
+    $downgradeLabel = if ([bool]$cfg.taskModeAllowAutoDowngrade) { T 'taskMode.status.on' } else { T 'taskMode.status.off' }
     Write-Host (("{0}: {1}" -f (T 'taskMode.currentMinConfidence'), [string]$cfg.taskModeMinConfidence)) -ForegroundColor DarkGray
-    Write-Host (("{0}: {1}" -f (T 'taskMode.currentReturnToPrimary'), [string]$cfg.taskModeReturnToPrimary)) -ForegroundColor DarkGray
-    Write-Host (("{0}: {1}" -f (T 'taskMode.currentAllowDowngrade'), [string]$cfg.taskModeAllowAutoDowngrade)) -ForegroundColor DarkGray
+    Write-Host (("{0}: {1}" -f (T 'taskMode.currentReturnToPrimary'), $returnLabel)) -ForegroundColor DarkGray
+    Write-Host (("{0}: {1}" -f (T 'taskMode.currentAllowDowngrade'), $downgradeLabel)) -ForegroundColor DarkGray
     Write-Host
     Write-Host ("1) " + (T 'taskMode.toggle'))
     Write-Host ("2) " + (T 'taskMode.show'))
-    Write-Host ("3) " + (T 'taskMode.primaryKind'))
-    Write-Host ("4) " + (T 'taskMode.kinds'))
-    Write-Host ("5) " + (T 'taskMode.minConfidence'))
+    Write-Host ("3) " + (T 'taskMode.kinds'))
+    Write-Host ("4) " + (T 'taskMode.minConfidence'))
     Write-Host ("6) " + (T 'taskMode.returnToPrimary'))
     Write-Host ("7) " + (T 'taskMode.allowDowngrade'))
     Write-Host ("0) " + (T 'menu.back'))
@@ -899,58 +1039,19 @@ function Run-TaskModeMenu {
 
     switch ($choice) {
       '1' {
-        $cfg.taskModeEnabled = -not [bool]$cfg.taskModeEnabled
+        $picked = Select-OnOff (T 'taskMode.toggle') ([bool]$cfg.taskModeEnabled)
+        if ($null -eq $picked) { continue }
+        $cfg.taskModeEnabled = [bool]$picked
         Save-RuntimeRouting $cfg
         Write-Host (T 'taskMode.saved') -ForegroundColor Green
         Wait-AnyKeyOrEsc
       }
       '2' {
-        Write-Host (T 'taskMode.currentConfig') -ForegroundColor Cyan
-        $cfg | ConvertTo-Json -Depth 10 | Write-Host
+        Show-TaskModeKinds $cfg
         Wait-AnyKeyOrEsc
       }
-      '3' {
-        $kinds = @(List-Kinds)
-        Print-NumberedList $kinds -Kinds
-        $pick = Read-ChoiceOrEsc (Tf 'prompt.chooseKind' @($kinds.Count))
-        if ($null -eq $pick -or $pick -eq '0') { continue }
-        $n = 0
-        if (-not [int]::TryParse($pick, [ref]$n)) { continue }
-        if ($n -lt 1 -or $n -gt $kinds.Count) { continue }
-        $cfg.taskModePrimaryKind = $kinds[$n - 1]
-        $existingKinds = @($cfg.taskModeKinds)
-        if ($existingKinds -notcontains $cfg.taskModePrimaryKind) {
-          $cfg.taskModeKinds = @($cfg.taskModePrimaryKind) + $existingKinds
-        }
-        $cfg.taskModeKinds = @($cfg.taskModeKinds | Select-Object -Unique)
-        Save-RuntimeRouting $cfg
-        Write-Host (T 'taskMode.saved') -ForegroundColor Green
-        Wait-AnyKeyOrEsc
-      }
+      '3' { Run-TaskModeKindsMenu }
       '4' {
-        $kinds = @(List-Kinds)
-        Write-Host (T 'taskMode.manageKindsTip') -ForegroundColor DarkGray
-        Print-NumberedList $kinds -Kinds
-        $sel = Read-InputOrEsc (Tf 'prompt.chooseKind' @($kinds.Count)) -AllowEmpty
-        if ($null -eq $sel -or $sel -eq '0') { continue }
-        $idxs = Parse-IndexList $sel $kinds.Count
-        $set = New-Object System.Collections.Generic.HashSet[string] ([System.StringComparer]::OrdinalIgnoreCase)
-        foreach ($item in @($cfg.taskModeKinds)) { [void]$set.Add([string]$item) }
-        foreach ($ii in $idxs) {
-          $kind = $kinds[$ii]
-          if ($set.Contains($kind)) {
-            if ($kind -ne [string]$cfg.taskModePrimaryKind) { [void]$set.Remove($kind) }
-          } else {
-            [void]$set.Add($kind)
-          }
-        }
-        [void]$set.Add([string]$cfg.taskModePrimaryKind)
-        $cfg.taskModeKinds = @($set | Sort-Object)
-        Save-RuntimeRouting $cfg
-        Write-Host (T 'taskMode.kindsUpdated') -ForegroundColor Green
-        Wait-AnyKeyOrEsc
-      }
-      '5' {
         Write-Host (T 'taskMode.pickConfidence') -ForegroundColor Cyan
         Write-Host '1) low'
         Write-Host '2) medium'
@@ -969,13 +1070,17 @@ function Run-TaskModeMenu {
         Wait-AnyKeyOrEsc
       }
       '6' {
-        $cfg.taskModeReturnToPrimary = -not [bool]$cfg.taskModeReturnToPrimary
+        $picked = Select-OnOff (T 'taskMode.returnToPrimary') ([bool]$cfg.taskModeReturnToPrimary)
+        if ($null -eq $picked) { continue }
+        $cfg.taskModeReturnToPrimary = [bool]$picked
         Save-RuntimeRouting $cfg
         Write-Host (T 'taskMode.saved') -ForegroundColor Green
         Wait-AnyKeyOrEsc
       }
       '7' {
-        $cfg.taskModeAllowAutoDowngrade = -not [bool]$cfg.taskModeAllowAutoDowngrade
+        $picked = Select-OnOff (T 'taskMode.allowDowngrade') ([bool]$cfg.taskModeAllowAutoDowngrade)
+        if ($null -eq $picked) { continue }
+        $cfg.taskModeAllowAutoDowngrade = [bool]$picked
         Save-RuntimeRouting $cfg
         Write-Host (T 'taskMode.saved') -ForegroundColor Green
         Wait-AnyKeyOrEsc

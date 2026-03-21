@@ -1053,6 +1053,7 @@ type RuntimeRoutingConfig = {
   taskModeEnabled: boolean;
   taskModePrimaryKind: string;
   taskModeKinds: string[];
+  taskModeDisabledKinds: string[];
   taskModeMinConfidence: Confidence;
   taskModeReturnToPrimary: boolean;
   taskModeAllowAutoDowngrade: boolean;
@@ -1169,6 +1170,7 @@ function getDefaultRuntimeRoutingConfig(cfg: ReturnType<typeof resolveConfig>): 
     taskModeEnabled: cfg.taskModeEnabled,
     taskModePrimaryKind: cfg.taskModePrimaryKind,
     taskModeKinds: taskKinds.length > 0 ? taskKinds : [DEFAULTS.taskModePrimaryKind],
+    taskModeDisabledKinds: [],
     taskModeMinConfidence: cfg.taskModeMinConfidence,
     taskModeReturnToPrimary: cfg.taskModeReturnToPrimary,
     taskModeAllowAutoDowngrade: cfg.taskModeAllowAutoDowngrade,
@@ -1200,6 +1202,15 @@ async function getRuntimeRoutingConfig(api: OpenClawPluginApi): Promise<RuntimeR
         ),
       )
     : defaults.taskModeKinds;
+  const taskModeDisabledKinds = Array.isArray(raw?.taskModeDisabledKinds)
+    ? Array.from(
+        new Set(
+          raw.taskModeDisabledKinds
+            .map((value) => String(value ?? "").trim())
+            .filter((value) => value.length > 0),
+        ),
+      )
+    : defaults.taskModeDisabledKinds;
 
   const value: RuntimeRoutingConfig = {
     taskModeEnabled:
@@ -1209,6 +1220,7 @@ async function getRuntimeRoutingConfig(api: OpenClawPluginApi): Promise<RuntimeR
       taskModeKinds.length > 0
         ? Array.from(new Set([taskModePrimaryKind, ...taskModeKinds]))
         : defaults.taskModeKinds,
+    taskModeDisabledKinds: taskModeDisabledKinds.filter((kind) => kind !== taskModePrimaryKind),
     taskModeMinConfidence:
       raw?.taskModeMinConfidence === "low" ||
       raw?.taskModeMinConfidence === "medium" ||
@@ -1374,7 +1386,9 @@ function isLongTaskKind(kind: string): boolean {
 
 function isTaskModeKind(kind: string, runtimeCfg: RuntimeRoutingConfig): boolean {
   const normalized = String(kind ?? "").trim().toLowerCase();
-  return runtimeCfg.taskModeKinds.some((value) => value.toLowerCase() === normalized);
+  const enabled = runtimeCfg.taskModeKinds.some((value) => value.toLowerCase() === normalized);
+  const disabled = runtimeCfg.taskModeDisabledKinds.some((value) => value.toLowerCase() === normalized);
+  return enabled && !disabled;
 }
 
 async function getTaskPrimaryModelForSession(
@@ -1909,6 +1923,7 @@ export default function register(api: OpenClawPluginApi) {
             taskModeEnabled: runtimeCfg.taskModeEnabled,
             taskModePrimaryKind: runtimeCfg.taskModePrimaryKind,
             taskModeKinds: runtimeCfg.taskModeKinds,
+            taskModeDisabledKinds: runtimeCfg.taskModeDisabledKinds,
             taskModeMinConfidence: runtimeCfg.taskModeMinConfidence,
           });
         }
