@@ -1275,10 +1275,97 @@ function resolveRouteSessionKeyFromMessageContext(
   return `fallback:${provider}:${accountId}:${from}`;
 }
 
-function shouldPreventAutomaticDowngrade(candidateModel: string, allowAutoDowngrade: boolean): boolean {
-  if (allowAutoDowngrade) return false;
-  const normalized = normalizeModelOverrideForProvider(candidateModel).override.toLowerCase();
+function canonicalModelForms(model: string): string[] {
+  const raw = String(model ?? "").trim();
+  if (!raw) return [];
+  const normalized = normalizeModelOverrideForProvider(raw).override;
+  return Array.from(new Set([raw.toLowerCase(), normalized.toLowerCase()]));
+}
+
+function areModelsEquivalent(a: string, b: string): boolean {
+  const left = canonicalModelForms(a);
+  const right = new Set(canonicalModelForms(b));
+  return left.some((value) => right.has(value));
+}
+
+function getPriorityListForKind(priorityFile: ModelPriorityFile | null, kind: string): string[] {
+  if (!priorityFile?.kinds) return [];
+  const direct = Array.isArray(priorityFile.kinds[kind]) ? priorityFile.kinds[kind] : [];
+  const fallback = Array.isArray(priorityFile.kinds.default) ? priorityFile.kinds.default : [];
+  return direct.length > 0 ? direct : fallback;
+}
+
+function getPriorityRankForKind(
+  priorityFile: ModelPriorityFile | null,
+  kind: string,
+  model: string,
+): number | null {
+  const list = getPriorityListForKind(priorityFile, kind);
+  if (list.length <= 0) return null;
+  const idx = list.findIndex((entry) => areModelsEquivalent(entry, model));
+  return idx >= 0 ? idx : null;
+}
+
+async function resolvePreferredModelForKind(params: {
+  api: OpenClawPluginApi;
+  cfg: ReturnType<typeof resolveConfig>;
+  kind: string;
+  fallbackModel: string;
+}): Promise<{ model: string; note: string; source: "priority" | "fallback" }> {
+  try {
+    const priorityFile = await loadJsonFile<ModelPriorityFile>(params.cfg.modelPriorityPath);
+    const catalog = await getModelCatalog(params.api, params.cfg);
+    const providerAuth = buildProviderAuthMapFromSnapshot(authCache?.value ?? null);
+    const picked = pickByPriority({
+      kind: params.kind,
+      catalog,
+      priorityFile,
+      classificationConfig: null as any,
+      providerAuth,
+    } as any);
+
+    if (picked.picked) {
+      return { model: picked.picked, note: picked.note, source: "priority" };
+    }
+  } catch {
+    // fail-open to fallback model below
+  }
+
+  return {
+    model: params.fallbackModel,
+    note: `fallback_primary kind=${params.kind} model=${params.fallbackModel}`,
+    source: "fallback",
+  };
+}
+
+function isConservativeLikelyDowngradeCandidate(model: string): boolean {
+  const normalized = normalizeModelOverrideForProvider(model).override.toLowerCase();
   return normalized.includes("gpt-5.2");
+}
+
+async function shouldPreventAutomaticDowngrade(params: {
+  api: OpenClawPluginApi;
+  cfg: ReturnType<typeof resolveConfig>;
+  kind: string;
+  primaryModel: string;
+  candidateModel: string;
+  allowAutoDowngrade: boolean;
+}): Promise<boolean> {
+  if (params.allowAutoDowngrade) return false;
+  if (areModelsEquivalent(params.primaryModel, params.candidateModel)) return false;
+
+  try {
+    const priorityFile = await loadJsonFile<ModelPriorityFile>(params.cfg.modelPriorityPath);
+    const primaryRank = getPriorityRankForKind(priorityFile, params.kind, params.primaryModel);
+    const candidateRank = getPriorityRankForKind(priorityFile, params.kind, params.candidateModel);
+    if (primaryRank !== null && candidateRank !== null) {
+      return candidateRank > primaryRank;
+    }
+  } catch {
+    // fall through to conservative guard
+  }
+
+  return isConservativeLikelyDowngradeCandidate(params.candidateModel);
 }
 
 function isLongTaskKind(kind: string): boolean {
@@ -1290,22 +1377,44 @@ function isTaskModeKind(kind: string, runtimeCfg: RuntimeRoutingConfig): boolean
   return runtimeCfg.taskModeKinds.some((value) => value.toLowerCase() === normalized);
 }
 
-function getTaskPrimaryModelForSession(
+async function getTaskPrimaryModelForSession(
+  api: OpenClawPluginApi,
+  cfg: ReturnType<typeof resolveConfig>,
   runtimeCfg: RuntimeRoutingConfig,
   decision: RouteDecision,
   existing?: TaskSessionState,
-): { primaryKind: string; primaryModel: string } {
+): Promise<{ primaryKind: string; primaryModel: string; note: string; source: "priority" | "fallback" | "existing" }> {
   if (existing?.primaryKind && existing?.primaryModel) {
-    return { primaryKind: existing.primaryKind, primaryModel: existing.primaryModel };
+    const resolved = await resolvePreferredModelForKind({
+      api,
+      cfg,
+      kind: existing.primaryKind,
+      fallbackModel: existing.primaryModel,
+    });
+    return {
+      primaryKind: existing.primaryKind,
+      primaryModel: resolved.model,
+      note: resolved.note,
+      source: resolved.source === "priority" && !areModelsEquivalent(resolved.model, existing.primaryModel)
+        ? "priority"
+        : "existing",
+    };
   }
 
-  if (isTaskModeKind(decision.kind, runtimeCfg) && decision.candidateModel) {
-    return { primaryKind: decision.kind, primaryModel: decision.candidateModel };
-  }
-
+  const primaryKind = isTaskModeKind(decision.kind, runtimeCfg)
+    ? decision.kind
+    : runtimeCfg.taskModePrimaryKind;
+  const resolved = await resolvePreferredModelForKind({
+    api,
+    cfg,
+    kind: primaryKind,
+    fallbackModel: decision.candidateModel,
+  });
   return {
-    primaryKind: runtimeCfg.taskModePrimaryKind,
-    primaryModel: decision.candidateModel,
+    primaryKind,
+    primaryModel: resolved.model,
+    note: resolved.note,
+    source: resolved.source,
   };
 }
 
@@ -1425,7 +1534,7 @@ export default function register(api: OpenClawPluginApi) {
         const existingTaskState = taskSessionStateBySession.get(sessionKey);
 
         if (runtimeCfg.taskModeEnabled) {
-          const primary = getTaskPrimaryModelForSession(runtimeCfg, decision, existingTaskState);
+          const primary = await getTaskPrimaryModelForSession(api, cfg, runtimeCfg, decision, existingTaskState);
           let nextTaskState: TaskSessionState = existingTaskState ?? {
             sessionKey,
             primaryKind: primary.primaryKind,
@@ -1434,45 +1543,60 @@ export default function register(api: OpenClawPluginApi) {
             lastRouteAt: Date.now(),
           };
 
-          if (!existingTaskState) {
-            taskSessionStateBySession.set(sessionKey, nextTaskState);
-            await appendJsonl(api, {
-              ts: nowIso(),
-              type: "soft_router_suggest",
-              event: "task_mode_primary_set",
-              dryRun: true,
-              sessionKey,
-              agentId,
-              primaryKind: nextTaskState.primaryKind,
-              primaryModel: nextTaskState.primaryModel,
-              sourceKind: decision.kind,
-              sourceModel: decision.candidateModel,
-            });
-          }
+          const primaryChanged =
+            !existingTaskState ||
+            existingTaskState.primaryKind !== primary.primaryKind ||
+            !areModelsEquivalent(existingTaskState.primaryModel, primary.primaryModel);
+
+          nextTaskState = {
+            ...nextTaskState,
+            primaryKind: primary.primaryKind,
+            primaryModel: primary.primaryModel,
+          };
+          taskSessionStateBySession.set(sessionKey, nextTaskState);
+
+          await appendJsonl(api, {
+            ts: nowIso(),
+            type: "soft_router_suggest",
+            event: primaryChanged
+              ? existingTaskState
+                ? "task_mode_primary_refreshed"
+                : "task_mode_primary_resolved"
+              : "task_mode_primary_kept",
+            dryRun: true,
+            sessionKey,
+            agentId,
+            primaryKind: nextTaskState.primaryKind,
+            primaryModel: nextTaskState.primaryModel,
+            sourceKind: decision.kind,
+            sourceModel: decision.candidateModel,
+            note: primary.note,
+          });
 
           const qualifiesAsTask =
             isTaskModeKind(decision.kind, runtimeCfg) &&
             confidenceRank(decision.confidence) >= confidenceRank(runtimeCfg.taskModeMinConfidence);
 
           if (qualifiesAsTask) {
-            nextTaskState = {
-              ...nextTaskState,
-              primaryKind: nextTaskState.primaryKind || decision.kind,
-              primaryModel: nextTaskState.primaryModel || decision.candidateModel,
-              temporaryKind: decision.kind !== nextTaskState.primaryKind ? decision.kind : undefined,
-              temporaryModel: decision.kind !== nextTaskState.primaryKind ? decision.candidateModel : undefined,
-              lastTaskAt: Date.now(),
-              lastRouteAt: Date.now(),
-            };
-
+            const wantsTemporary = decision.kind !== nextTaskState.primaryKind;
             if (
-              shouldPreventAutomaticDowngrade(
-                decision.candidateModel,
-                runtimeCfg.taskModeAllowAutoDowngrade,
-              )
+              wantsTemporary &&
+              (await shouldPreventAutomaticDowngrade({
+                api,
+                cfg,
+                kind: nextTaskState.primaryKind,
+                primaryModel: nextTaskState.primaryModel,
+                candidateModel: decision.candidateModel,
+                allowAutoDowngrade: runtimeCfg.taskModeAllowAutoDowngrade,
+              }))
             ) {
               routeDecisionBySession.delete(sessionKey);
-              taskSessionStateBySession.set(sessionKey, nextTaskState);
+              taskSessionStateBySession.set(sessionKey, {
+                ...nextTaskState,
+                temporaryKind: undefined,
+                temporaryModel: undefined,
+                lastRouteAt: Date.now(),
+              });
               await appendJsonl(api, {
                 ts: nowIso(),
                 type: "soft_router_suggest",
@@ -1486,34 +1610,43 @@ export default function register(api: OpenClawPluginApi) {
                 confidence: decision.confidence,
                 candidateModel: decision.candidateModel,
                 primaryModel: nextTaskState.primaryModel,
+                primaryKind: nextTaskState.primaryKind,
               });
               return;
             }
 
-            if (nextTaskState.temporaryModel && nextTaskState.temporaryModel !== nextTaskState.primaryModel) {
+            nextTaskState = {
+              ...nextTaskState,
+              temporaryKind: wantsTemporary ? decision.kind : undefined,
+              temporaryModel: wantsTemporary ? decision.candidateModel : undefined,
+              lastTaskAt: Date.now(),
+              lastRouteAt: Date.now(),
+            };
+
+            if (nextTaskState.temporaryModel && !areModelsEquivalent(nextTaskState.temporaryModel, nextTaskState.primaryModel)) {
               targetModel = nextTaskState.temporaryModel;
               targetKind = nextTaskState.temporaryKind ?? decision.kind;
               logEvent = "task_mode_temp_override_applied";
-              logNote = `task mode temporary override from ${nextTaskState.primaryKind} to ${targetKind}`;
+              logNote = `task mode temporary override from ${nextTaskState.primaryKind}(${nextTaskState.primaryModel}) to ${targetKind}(${targetModel})`;
             } else {
               targetModel = nextTaskState.primaryModel;
               targetKind = nextTaskState.primaryKind;
-              logEvent = "route_override_applied";
-              logNote = decision.reason;
+              logEvent = "task_mode_primary_kept";
+              logNote = `task mode keep primary ${nextTaskState.primaryKind}(${nextTaskState.primaryModel})`;
             }
 
             taskSessionStateBySession.set(sessionKey, nextTaskState);
           } else {
-            const hasTemporaryModel = Boolean(existingTaskState?.temporaryModel);
-            if (runtimeCfg.taskModeReturnToPrimary && existingTaskState?.primaryModel) {
-              targetModel = existingTaskState.primaryModel;
-              targetKind = existingTaskState.primaryKind;
-              logEvent = hasTemporaryModel ? "task_mode_return_to_primary" : "route_override_applied";
-              logNote = hasTemporaryModel
-                ? `task mode return to primary ${existingTaskState.primaryKind}`
-                : `task mode keep primary ${existingTaskState.primaryKind}`;
+            const hadTemporaryModel = Boolean(existingTaskState?.temporaryModel);
+            if (runtimeCfg.taskModeReturnToPrimary && nextTaskState.primaryModel) {
+              targetModel = nextTaskState.primaryModel;
+              targetKind = nextTaskState.primaryKind;
+              logEvent = hadTemporaryModel ? "task_mode_return_to_primary" : "task_mode_primary_kept";
+              logNote = hadTemporaryModel
+                ? `task mode return to primary ${nextTaskState.primaryKind}(${nextTaskState.primaryModel})`
+                : `task mode keep primary ${nextTaskState.primaryKind}(${nextTaskState.primaryModel})`;
               taskSessionStateBySession.set(sessionKey, {
-                ...existingTaskState,
+                ...nextTaskState,
                 temporaryKind: undefined,
                 temporaryModel: undefined,
                 lastRouteAt: Date.now(),
@@ -1574,7 +1707,7 @@ export default function register(api: OpenClawPluginApi) {
             return;
           }
 
-          if (shouldPreventAutomaticDowngrade(decision.candidateModel, false)) {
+          if (isConservativeLikelyDowngradeCandidate(decision.candidateModel)) {
             routeDecisionBySession.delete(sessionKey);
             await appendJsonl(api, {
               ts: nowIso(),
