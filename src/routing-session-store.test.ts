@@ -86,3 +86,17 @@ test("RoutingSessionStore can find route decision by conversationId or messageHa
   );
   assert.equal(store.findRouteDecision({ messageHash: "s1-hash" })?.sessionKey, "s1");
 });
+
+test("RoutingSessionStore reports which lookup path matched a route decision", () => {
+  const store = new RoutingSessionStore();
+  const decision = makeDecision("s1", 20_000);
+  store.setRouteDecision("s1", decision);
+
+  assert.deepEqual(store.findRouteDecisionMatch({ sessionKey: "s1" }).source, "sessionKey");
+  assert.deepEqual(
+    store.findRouteDecisionMatch({ conversationId: "s1-conversation" }).source,
+    "conversationId",
+  );
+  assert.deepEqual(store.findRouteDecisionMatch({ messageHash: "s1-hash" }).source, "messageHash");
+  assert.deepEqual(store.findRouteDecisionMatch({ sessionKey: "missing" }).source, "miss");
+});

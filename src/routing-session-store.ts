@@ -37,6 +37,14 @@ export type SessionStateEntry = {
   state: SessionRoutingState;
 };
 
+export type RouteDecisionMatchSource = "sessionKey" | "conversationId" | "messageHash" | "miss";
+
+export type RouteDecisionMatch = {
+  source: RouteDecisionMatchSource;
+  matchedSessionKey?: string;
+  decision?: RouteDecision;
+};
+
 export class RoutingSessionStore {
   private readonly sessions = new Map<string, SessionRoutingState>();
   private readonly decisionByConversationId = new Map<string, string>();
@@ -63,10 +71,18 @@ export class RoutingSessionStore {
     conversationId?: string;
     messageHash?: string;
   }): RouteDecision | undefined {
+    return this.findRouteDecisionMatch(match).decision;
+  }
+
+  findRouteDecisionMatch(match: {
+    sessionKey?: string;
+    conversationId?: string;
+    messageHash?: string;
+  }): RouteDecisionMatch {
     const sessionKey = String(match.sessionKey ?? "").trim();
     if (sessionKey) {
       const direct = this.getRouteDecision(sessionKey);
-      if (direct) return direct;
+      if (direct) return { source: "sessionKey", matchedSessionKey: sessionKey, decision: direct };
     }
 
     const conversationId = String(match.conversationId ?? "").trim();
@@ -74,7 +90,13 @@ export class RoutingSessionStore {
       const matchedSessionKey = this.decisionByConversationId.get(conversationId);
       if (matchedSessionKey) {
         const byConversation = this.getRouteDecision(matchedSessionKey);
-        if (byConversation) return byConversation;
+        if (byConversation) {
+          return {
+            source: "conversationId",
+            matchedSessionKey,
+            decision: byConversation,
+          };
+        }
       }
     }
 
@@ -83,11 +105,17 @@ export class RoutingSessionStore {
       const matchedSessionKey = this.decisionByMessageHash.get(messageHash);
       if (matchedSessionKey) {
         const byMessageHash = this.getRouteDecision(matchedSessionKey);
-        if (byMessageHash) return byMessageHash;
+        if (byMessageHash) {
+          return {
+            source: "messageHash",
+            matchedSessionKey,
+            decision: byMessageHash,
+          };
+        }
       }
     }
 
-    return undefined;
+    return { source: "miss" };
   }
 
   setRouteDecision(sessionKey: string, decision: RouteDecision): void {

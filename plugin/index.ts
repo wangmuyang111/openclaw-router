@@ -1468,11 +1468,14 @@ export default function register(api: OpenClawPluginApi) {
         const agentId = ctxAny?.agentId;
         const runtimeCfg = await getRuntimeRoutingConfig(api);
 
-        const decision = routingSessionStore.findRouteDecision({
+        const attemptedConversationId =
+          String(ctxAny?.conversationId ?? ctx.conversationId ?? "").trim() || undefined;
+        const match = routingSessionStore.findRouteDecisionMatch({
           sessionKey,
-          conversationId: String(ctxAny?.conversationId ?? ctx.conversationId ?? "").trim() || undefined,
+          conversationId: attemptedConversationId,
           messageHash: promptHash,
         });
+        const decision = match.decision;
         if (!decision) {
           await appendJsonl(api, {
             ts: nowIso(),
@@ -1481,14 +1484,16 @@ export default function register(api: OpenClawPluginApi) {
             pid: process.pid,
             dryRun: true,
             sessionKey,
+            attemptedConversationId,
+            attemptedMessageHash: promptHash,
             agentId,
-            promptHash,
+            matchSource: match.source,
           });
           return;
         }
 
         if (decision.expiresAtMs <= Date.now()) {
-          routingSessionStore.clearRouteDecision(sessionKey);
+          routingSessionStore.clearRouteDecision(decision.sessionKey);
           await appendJsonl(api, {
             ts: nowIso(),
             type: "soft_router_suggest",
@@ -1496,12 +1501,17 @@ export default function register(api: OpenClawPluginApi) {
             pid: process.pid,
             dryRun: true,
             sessionKey,
+            matchedSessionKey: match.matchedSessionKey,
+            attemptedConversationId,
+            attemptedMessageHash: promptHash,
             agentId,
-            promptHash,
+            matchSource: match.source,
             messageHash: decision.messageHash,
           });
           return;
         }
+
+        const effectiveSessionKey = match.matchedSessionKey ?? decision.sessionKey ?? sessionKey;
 
         await appendJsonl(api, {
           ts: nowIso(),
@@ -1509,9 +1519,13 @@ export default function register(api: OpenClawPluginApi) {
           event: "route_cache_hit",
           pid: process.pid,
           dryRun: true,
-          sessionKey,
+          sessionKey: effectiveSessionKey,
+          runtimeSessionKey: sessionKey,
+          matchedSessionKey: match.matchedSessionKey,
+          attemptedConversationId,
+          attemptedMessageHash: promptHash,
           agentId,
-          promptHash,
+          matchSource: match.source,
           kind: decision.kind,
           confidence: decision.confidence,
           candidateModel: decision.candidateModel,
@@ -1522,7 +1536,7 @@ export default function register(api: OpenClawPluginApi) {
         let targetKind = decision.kind;
         let logEvent = "route_override_applied";
         let logNote = decision.reason;
-        const existingTaskState = routingSessionStore.getTaskState(sessionKey);
+        const existingTaskState = routingSessionStore.getTaskState(effectiveSessionKey);
 
         if (runtimeCfg.taskModeEnabled) {
           const primary = await getTaskPrimaryModelForSession(api, cfg, runtimeCfg, decision, existingTaskState);
@@ -1544,7 +1558,7 @@ export default function register(api: OpenClawPluginApi) {
             primaryKind: primary.primaryKind,
             primaryModel: primary.primaryModel,
           };
-          routingSessionStore.setTaskState(sessionKey, nextTaskState);
+          routingSessionStore.setTaskState(effectiveSessionKey, nextTaskState);
 
           await appendJsonl(api, {
             ts: nowIso(),
@@ -1555,7 +1569,9 @@ export default function register(api: OpenClawPluginApi) {
                 : "task_mode_primary_resolved"
               : "task_mode_primary_kept",
             dryRun: true,
-            sessionKey,
+            sessionKey: effectiveSessionKey,
+            runtimeSessionKey: sessionKey,
+            matchSource: match.source,
             agentId,
             primaryKind: nextTaskState.primaryKind,
             primaryModel: nextTaskState.primaryModel,
@@ -1581,8 +1597,8 @@ export default function register(api: OpenClawPluginApi) {
                 allowAutoDowngrade: runtimeCfg.taskModeAllowAutoDowngrade,
               }))
             ) {
-              routingSessionStore.clearRouteDecision(sessionKey);
-              routingSessionStore.setTaskState(sessionKey, {
+              routingSessionStore.clearRouteDecision(effectiveSessionKey);
+              routingSessionStore.setTaskState(effectiveSessionKey, {
                 ...nextTaskState,
                 temporaryKind: undefined,
                 temporaryModel: undefined,
@@ -1594,7 +1610,9 @@ export default function register(api: OpenClawPluginApi) {
                 event: "task_mode_downgrade_blocked",
                 pid: process.pid,
                 dryRun: true,
-                sessionKey,
+                sessionKey: effectiveSessionKey,
+                runtimeSessionKey: sessionKey,
+                matchSource: match.source,
                 agentId,
                 promptHash,
                 kind: decision.kind,
@@ -1626,7 +1644,7 @@ export default function register(api: OpenClawPluginApi) {
               logNote = `task mode keep primary ${nextTaskState.primaryKind}(${nextTaskState.primaryModel})`;
             }
 
-            routingSessionStore.setTaskState(sessionKey, nextTaskState);
+            routingSessionStore.setTaskState(effectiveSessionKey, nextTaskState);
           } else {
             const hadTemporaryModel = Boolean(existingTaskState?.temporaryModel);
             const explicitReturnModel = runtimeCfg.taskModeReturnModel.trim();
@@ -1638,21 +1656,23 @@ export default function register(api: OpenClawPluginApi) {
               logNote = hadTemporaryModel
                 ? `task mode return to ${returnModel} for ${nextTaskState.primaryKind}`
                 : `task mode keep return model ${returnModel} for ${nextTaskState.primaryKind}`;
-              routingSessionStore.setTaskState(sessionKey, {
+              routingSessionStore.setTaskState(effectiveSessionKey, {
                 ...nextTaskState,
                 temporaryKind: undefined,
                 temporaryModel: undefined,
                 lastRouteAt: Date.now(),
               });
             } else if (!runtimeCfg.freeSwitchWhenTaskModeOff) {
-              routingSessionStore.clearRouteDecision(sessionKey);
+              routingSessionStore.clearRouteDecision(effectiveSessionKey);
               await appendJsonl(api, {
                 ts: nowIso(),
                 type: "soft_router_suggest",
                 event: "route_override_skipped_non_long_task",
                 pid: process.pid,
                 dryRun: true,
-                sessionKey,
+                sessionKey: effectiveSessionKey,
+                runtimeSessionKey: sessionKey,
+                matchSource: match.source,
                 agentId,
                 promptHash,
                 kind: decision.kind,
@@ -1664,14 +1684,16 @@ export default function register(api: OpenClawPluginApi) {
           }
         } else {
           if (!isLongTaskKind(decision.kind)) {
-            routingSessionStore.clearRouteDecision(sessionKey);
+            routingSessionStore.clearRouteDecision(effectiveSessionKey);
             await appendJsonl(api, {
               ts: nowIso(),
               type: "soft_router_suggest",
               event: "route_override_skipped_non_long_task",
               pid: process.pid,
               dryRun: true,
-              sessionKey,
+              sessionKey: effectiveSessionKey,
+              runtimeSessionKey: sessionKey,
+              matchSource: match.source,
               agentId,
               promptHash,
               kind: decision.kind,
@@ -1682,14 +1704,16 @@ export default function register(api: OpenClawPluginApi) {
           }
 
           if (confidenceRank(decision.confidence) < confidenceRank("medium")) {
-            routingSessionStore.clearRouteDecision(sessionKey);
+            routingSessionStore.clearRouteDecision(effectiveSessionKey);
             await appendJsonl(api, {
               ts: nowIso(),
               type: "soft_router_suggest",
               event: "route_override_skipped_low_confidence",
               pid: process.pid,
               dryRun: true,
-              sessionKey,
+              sessionKey: effectiveSessionKey,
+              runtimeSessionKey: sessionKey,
+              matchSource: match.source,
               agentId,
               promptHash,
               kind: decision.kind,
@@ -1701,14 +1725,16 @@ export default function register(api: OpenClawPluginApi) {
           }
 
           if (isConservativeLikelyDowngradeCandidate(decision.candidateModel)) {
-            routingSessionStore.clearRouteDecision(sessionKey);
+            routingSessionStore.clearRouteDecision(effectiveSessionKey);
             await appendJsonl(api, {
               ts: nowIso(),
               type: "soft_router_suggest",
               event: "route_override_skipped_downgrade_guard",
               pid: process.pid,
               dryRun: true,
-              sessionKey,
+              sessionKey: effectiveSessionKey,
+              runtimeSessionKey: sessionKey,
+              matchSource: match.source,
               agentId,
               promptHash,
               kind: decision.kind,
@@ -1719,7 +1745,7 @@ export default function register(api: OpenClawPluginApi) {
           }
         }
 
-        const okToLog = await shouldLogModelOverride({ logDir: cfg.logDir }, sessionKey, targetModel);
+        const okToLog = await shouldLogModelOverride({ logDir: cfg.logDir }, effectiveSessionKey, targetModel);
         const norm = normalizeModelOverrideForProvider(targetModel);
 
         if (okToLog) {
@@ -1729,7 +1755,9 @@ export default function register(api: OpenClawPluginApi) {
             event: logEvent,
             pid: process.pid,
             dryRun: false,
-            sessionKey,
+            sessionKey: effectiveSessionKey,
+            runtimeSessionKey: sessionKey,
+            matchSource: match.source,
             agentId,
             promptHash,
             messageHash: decision.messageHash,
@@ -1741,16 +1769,16 @@ export default function register(api: OpenClawPluginApi) {
           });
         }
 
-        routingSessionStore.clearRouteDecision(sessionKey);
+        routingSessionStore.clearRouteDecision(effectiveSessionKey);
 
         try {
           if (norm.normalizedFrom) {
             console.log(
-              `[soft-router-suggest] route_override_normalized from=${norm.normalizedFrom} to=${norm.override} sessionKey=${sessionKey}`,
+              `[soft-router-suggest] route_override_normalized from=${norm.normalizedFrom} to=${norm.override} sessionKey=${effectiveSessionKey} runtimeSessionKey=${sessionKey} matchSource=${match.source}`,
             );
           }
           console.log(
-            `[soft-router-suggest] route_override sessionKey=${sessionKey} agentId=${String(
+            `[soft-router-suggest] route_override sessionKey=${effectiveSessionKey} runtimeSessionKey=${sessionKey} matchSource=${match.source} agentId=${String(
               agentId ?? "",
             )} kind=${targetKind} confidence=${decision.confidence} picked=${targetModel} promptHash=${promptHash}`,
           );
