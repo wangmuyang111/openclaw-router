@@ -1,6 +1,24 @@
-import type { CompiledRoutingRules, CompiledKindRule } from "./keyword-library.ts";
-
 export type RoutingConfidence = "low" | "medium" | "high";
+
+export type CompiledKindRule = {
+  id: string;
+  name?: string;
+  priority: number;
+  enabled: boolean;
+  positive: Array<{ keywords: string[]; weight: number; match: "contains"; exclude: boolean; sourceSet: string }>;
+  negative: Array<{ keywords: string[]; weight: number; match: "contains"; exclude: boolean; sourceSet: string }>;
+  metadata: Array<{ field: "hasImage" | "hasCodeBlock"; equals: boolean; weight: number; exclude: boolean }>;
+  regex: Array<{ pattern: string; flags: string; weight: number }>;
+  thresholds: { minScore: number; highScore: number; minStrongHits: number };
+  models: { strategy: "priority_list"; list: string[] };
+};
+
+export type CompiledRoutingRules = {
+  version: number;
+  compiledAt: string;
+  defaultFallbackKind: string;
+  kinds: CompiledKindRule[];
+};
 
 export type RoutingDecision = {
   kind: string;
@@ -33,8 +51,6 @@ function hasCodeBlock(content: string): boolean {
 
 function contentContains(content: { raw: string; lower: string }, term: string): boolean {
   if (!term) return false;
-  // We keep matching simple: contains on both raw and lowercased.
-  // This preserves CN/EN behavior with minimal surprises.
   return content.raw.includes(term) || content.lower.includes(term.toLowerCase());
 }
 
@@ -49,11 +65,14 @@ function computeConfidence(score: number, thresholds: { minScore: number; highSc
 }
 
 function isStrongGroup(group: { weight: number; sourceSet: string }): boolean {
-  // Convention: strong groups use weight >= 3 OR set name ends with '.strong'
   return group.weight >= 3 || group.sourceSet.endsWith(".strong");
 }
 
-function scoreKind(kind: CompiledKindRule, content: { raw: string; lower: string }, metadata?: Record<string, unknown>): {
+function scoreKind(
+  kind: CompiledKindRule,
+  content: { raw: string; lower: string },
+  metadata?: Record<string, unknown>,
+): {
   eligible: boolean;
   score: number;
   strongHits: number;
@@ -74,9 +93,9 @@ function scoreKind(kind: CompiledKindRule, content: { raw: string; lower: string
 
   const signals: string[] = [];
 
-  // Metadata signals
   for (const m of kind.metadata ?? []) {
-    const val = m.field === "hasImage" ? hasImage(metadata) : m.field === "hasCodeBlock" ? hasCodeBlock(content.raw) : false;
+    const val =
+      m.field === "hasImage" ? hasImage(metadata) : m.field === "hasCodeBlock" ? hasCodeBlock(content.raw) : false;
     if (val === m.equals) {
       if (m.exclude) return { eligible: false, score: 0, strongHits: 0, hits: 0, matched, signals: [] };
       score += m.weight;
@@ -86,7 +105,6 @@ function scoreKind(kind: CompiledKindRule, content: { raw: string; lower: string
     }
   }
 
-  // Regex signals
   for (const r of kind.regex ?? []) {
     if (!r.pattern) continue;
     try {
@@ -102,7 +120,6 @@ function scoreKind(kind: CompiledKindRule, content: { raw: string; lower: string
     }
   }
 
-  // Positive keyword groups
   for (const group of kind.positive ?? []) {
     for (const term of group.keywords ?? []) {
       if (!term) continue;
@@ -112,20 +129,17 @@ function scoreKind(kind: CompiledKindRule, content: { raw: string; lower: string
         hits += 1;
         if (isStrongGroup(group)) strongHits += 1;
         matched.positive.push({ set: group.sourceSet, term, weight: group.weight });
-        // avoid flooding signals: keep a compact record
         signals.push(`+${group.weight}:${group.sourceSet}`);
-        // Do NOT break: allow multiple terms to accumulate.
       }
     }
   }
 
-  // Negative keyword groups (penalty by default)
   for (const group of kind.negative ?? []) {
     for (const term of group.keywords ?? []) {
       if (!term) continue;
       if (contentContains(content, term)) {
         if (group.exclude) return { eligible: false, score: 0, strongHits: 0, hits: 0, matched, signals: [] };
-        score += group.weight; // negative weight
+        score += group.weight;
         hits += 1;
         matched.negative.push({ set: group.sourceSet, term, weight: group.weight });
         signals.push(`${group.weight}:${group.sourceSet}`);
@@ -133,7 +147,6 @@ function scoreKind(kind: CompiledKindRule, content: { raw: string; lower: string
     }
   }
 
-  // Threshold gating
   const minStrongHits = kind.thresholds?.minStrongHits ?? 0;
   const minScore = kind.thresholds?.minScore ?? 2;
   if (strongHits < minStrongHits) return { eligible: false, score, strongHits, hits, matched, signals };
@@ -142,6 +155,11 @@ function scoreKind(kind: CompiledKindRule, content: { raw: string; lower: string
   return { eligible: true, score, strongHits, hits, matched, signals };
 }
 
+/**
+ * Mechanism-level guarantee:
+ * - 'chat' never participates in weighted matching.
+ * - the configured defaultFallbackKind is used only when NO other kind met thresholds.
+ */
 export function routeByWeightedRules(params: {
   rules: CompiledRoutingRules;
   content: string;
@@ -153,10 +171,6 @@ export function routeByWeightedRules(params: {
 
   const fallbackKindId = String(params.rules.defaultFallbackKind ?? "chat").trim() || "chat";
 
-  // Mechanism-level guarantee:
-  // - 'chat' never participates in weighted matching.
-  // - the configured defaultFallbackKind is used only when NO other kind met thresholds.
-  // This prevents a fallback kind with minScore=0 (like chat) from always winning "by default".
   const enabledKinds = (params.rules.kinds ?? [])
     .filter((k) => k.enabled !== false)
     .filter((k) => k.id !== "chat")
