@@ -45,6 +45,7 @@
     "build:cli": "tsc -p tsconfig.json",
     "test": "npm run build && node --test dist/**/*.test.js",
     "test:sticky": "npm run build && node --test dist/sticky-regression.test.js",
+    "summarize:runtime-log": "node ./scripts/summarize-runtime-routing-log.mjs",
     "windows:doctor": "powershell -ExecutionPolicy Bypass -File ./scripts/doctor.ps1",
     "windows:install": "powershell -ExecutionPolicy Bypass -File ./scripts/install.ps1",
     "windows:repair": "powershell -ExecutionPolicy Bypass -File ./scripts/repair.ps1",
