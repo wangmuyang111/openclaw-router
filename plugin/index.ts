@@ -24,6 +24,13 @@ import { promisify } from "node:util";
 // NEW: keyword library + weighted routing (for user-custom keyword add/remove)
 import { loadAndCompileRoutingRules } from "./keyword-library.ts";
 import { routeByWeightedRules } from "./weighted-routing-engine.ts";
+import { resolveRouteSessionKey } from "../src/route-session-key.ts";
+import {
+  RoutingSessionStore,
+  type Confidence,
+  type RouteDecision,
+  type TaskSessionState,
+} from "../src/routing-session-store.ts";
 
 type PluginConfig = {
   enabled?: boolean;
@@ -66,6 +73,7 @@ type PluginConfig = {
   taskModeKinds?: string[];
   taskModeMinConfidence?: "low" | "medium" | "high";
   taskModeReturnToPrimary?: boolean;
+  taskModeReturnModel?: string;
   taskModeAllowAutoDowngrade?: boolean;
   freeSwitchWhenTaskModeOff?: boolean;
 };
@@ -127,6 +135,7 @@ const DEFAULTS = {
   taskModeKinds: ["coding"],
   taskModeMinConfidence: "medium" as const,
   taskModeReturnToPrimary: true,
+  taskModeReturnModel: "",
   taskModeAllowAutoDowngrade: false,
   freeSwitchWhenTaskModeOff: true,
 } as const;
@@ -279,6 +288,10 @@ function resolveConfig(api: OpenClawPluginApi): Required<typeof DEFAULTS> {
     typeof cfg.taskModeReturnToPrimary === "boolean"
       ? cfg.taskModeReturnToPrimary
       : DEFAULTS.taskModeReturnToPrimary;
+  const taskModeReturnModel =
+    typeof cfg.taskModeReturnModel === "string" && cfg.taskModeReturnModel.trim()
+      ? cfg.taskModeReturnModel.trim()
+      : DEFAULTS.taskModeReturnModel;
   const taskModeAllowAutoDowngrade =
     typeof cfg.taskModeAllowAutoDowngrade === "boolean"
       ? cfg.taskModeAllowAutoDowngrade
@@ -323,6 +336,7 @@ function resolveConfig(api: OpenClawPluginApi): Required<typeof DEFAULTS> {
     taskModeKinds,
     taskModeMinConfidence,
     taskModeReturnToPrimary,
+    taskModeReturnModel,
     taskModeAllowAutoDowngrade,
     freeSwitchWhenTaskModeOff,
   };
@@ -1004,8 +1018,6 @@ function preview(text: string, n: number) {
   return t.slice(0, n) + `... (+${t.length - n} chars)`;
 }
 
-type Confidence = "low" | "medium" | "high";
-
 type Availability = {
   status: "ok" | "degraded" | "unknown";
   auth?: "ok" | "expired" | "unknown";
@@ -1032,23 +1044,6 @@ type Suggestion = {
   fallback?: FallbackSuggestion;
 };
 
-type RouteDecision = {
-  sessionKey: string;
-  conversationId?: string;
-  channelId?: string;
-  messageId?: string;
-  messageHash: string;
-  contentPreview?: string;
-  kind: string;
-  confidence: Confidence;
-  candidateModel: string;
-  reason: string;
-  signals: string[];
-  createdAtMs: number;
-  expiresAtMs: number;
-  source: "message_received";
-};
-
 type RuntimeRoutingConfig = {
   taskModeEnabled: boolean;
   taskModePrimaryKind: string;
@@ -1056,18 +1051,9 @@ type RuntimeRoutingConfig = {
   taskModeDisabledKinds: string[];
   taskModeMinConfidence: Confidence;
   taskModeReturnToPrimary: boolean;
+  taskModeReturnModel: string;
   taskModeAllowAutoDowngrade: boolean;
   freeSwitchWhenTaskModeOff: boolean;
-};
-
-type TaskSessionState = {
-  sessionKey: string;
-  primaryKind: string;
-  primaryModel: string;
-  temporaryKind?: string;
-  temporaryModel?: string;
-  lastTaskAt: number;
-  lastRouteAt: number;
 };
 
 async function appendJsonl(api: OpenClawPluginApi, obj: unknown) {
@@ -1116,8 +1102,7 @@ async function appendJsonl(api: OpenClawPluginApi, obj: unknown) {
 
 // Dedup map (in-memory, per process).
 const recentOverrides = new Map<string, number>();
-const routeDecisionBySession = new Map<string, RouteDecision>();
-const taskSessionStateBySession = new Map<string, TaskSessionState>();
+const routingSessionStore = new RoutingSessionStore();
 const ROUTE_DECISION_TTL_MS = 90_000;
 const RUNTIME_ROUTING_TTL_MS = 5_000;
 const LONG_TASK_KINDS = new Set(["strategy", "coding", "vision"]);
@@ -1173,6 +1158,7 @@ function getDefaultRuntimeRoutingConfig(cfg: ReturnType<typeof resolveConfig>): 
     taskModeDisabledKinds: [],
     taskModeMinConfidence: cfg.taskModeMinConfidence,
     taskModeReturnToPrimary: cfg.taskModeReturnToPrimary,
+    taskModeReturnModel: cfg.taskModeReturnModel,
     taskModeAllowAutoDowngrade: cfg.taskModeAllowAutoDowngrade,
     freeSwitchWhenTaskModeOff: cfg.freeSwitchWhenTaskModeOff,
   };
@@ -1202,6 +1188,10 @@ async function getRuntimeRoutingConfig(api: OpenClawPluginApi): Promise<RuntimeR
         ),
       )
     : defaults.taskModeKinds;
+  const taskModeReturnModel =
+    typeof raw?.taskModeReturnModel === "string" && raw.taskModeReturnModel.trim()
+      ? raw.taskModeReturnModel.trim()
+      : defaults.taskModeReturnModel;
   const taskModeDisabledKinds = Array.isArray(raw?.taskModeDisabledKinds)
     ? Array.from(
         new Set(
@@ -1231,6 +1221,7 @@ async function getRuntimeRoutingConfig(api: OpenClawPluginApi): Promise<RuntimeR
       typeof raw?.taskModeReturnToPrimary === "boolean"
         ? raw.taskModeReturnToPrimary
         : defaults.taskModeReturnToPrimary,
+    taskModeReturnModel,
     taskModeAllowAutoDowngrade:
       typeof raw?.taskModeAllowAutoDowngrade === "boolean"
         ? raw.taskModeAllowAutoDowngrade
@@ -1246,11 +1237,7 @@ async function getRuntimeRoutingConfig(api: OpenClawPluginApi): Promise<RuntimeR
 }
 
 function pruneExpiredRouteDecisions(now = Date.now()) {
-  for (const [key, value] of routeDecisionBySession.entries()) {
-    if (!value || value.expiresAtMs <= now) {
-      routeDecisionBySession.delete(key);
-    }
-  }
+  routingSessionStore.pruneExpiredRouteDecisions(now);
 }
 
 function confidenceRank(c: string): number {
@@ -1260,31 +1247,8 @@ function confidenceRank(c: string): number {
 function resolveRouteSessionKeyFromMessageContext(
   ctx: PluginHookMessageContext,
   event: PluginHookMessageReceivedEvent,
-): string | null {
-  const ctxAny = ctx as any;
-  const metadata = (event.metadata ?? {}) as Record<string, unknown>;
-  const candidates = [
-    ctxAny?.sessionKey,
-    metadata.sessionKey,
-    metadata.session_key,
-    metadata.threadId,
-    metadata.thread_id,
-    metadata.conversationId,
-    metadata.conversation_id,
-    ctx.conversationId,
-    metadata.chatId,
-    metadata.chat_id,
-  ];
-
-  for (const value of candidates) {
-    const text = String(value ?? "").trim();
-    if (text) return text;
-  }
-
-  const provider = String(metadata.provider ?? ctx.channelId ?? "unknown").trim() || "unknown";
-  const accountId = String(ctx.accountId ?? metadata.accountId ?? metadata.account_id ?? "unknown").trim() || "unknown";
-  const from = String(event.from ?? metadata.from ?? "unknown").trim() || "unknown";
-  return `fallback:${provider}:${accountId}:${from}`;
+): string {
+  return resolveRouteSessionKey(ctx as any, event as any);
 }
 
 function canonicalModelForms(model: string): string[] {
@@ -1490,12 +1454,15 @@ export default function register(api: OpenClawPluginApi) {
         pruneExpiredRouteDecisions();
 
         const promptText = String(event.prompt ?? "");
-        const sessionKey = String((ctx as any)?.sessionKey ?? "unknown");
+        const ctxAny = ctx as any;
+        const sessionKey = String(
+          ctxAny?.sessionKey ?? ctxAny?.threadId ?? ctxAny?.conversationId ?? ctx.conversationId ?? "unknown",
+        );
         const promptHash = crypto.createHash("sha1").update(promptText).digest("hex").slice(0, 16);
-        const agentId = (ctx as any)?.agentId;
+        const agentId = ctxAny?.agentId;
         const runtimeCfg = await getRuntimeRoutingConfig(api);
 
-        const decision = routeDecisionBySession.get(sessionKey);
+        const decision = routingSessionStore.getRouteDecision(sessionKey);
         if (!decision) {
           await appendJsonl(api, {
             ts: nowIso(),
@@ -1511,7 +1478,7 @@ export default function register(api: OpenClawPluginApi) {
         }
 
         if (decision.expiresAtMs <= Date.now()) {
-          routeDecisionBySession.delete(sessionKey);
+          routingSessionStore.clearRouteDecision(sessionKey);
           await appendJsonl(api, {
             ts: nowIso(),
             type: "soft_router_suggest",
@@ -1545,7 +1512,7 @@ export default function register(api: OpenClawPluginApi) {
         let targetKind = decision.kind;
         let logEvent = "route_override_applied";
         let logNote = decision.reason;
-        const existingTaskState = taskSessionStateBySession.get(sessionKey);
+        const existingTaskState = routingSessionStore.getTaskState(sessionKey);
 
         if (runtimeCfg.taskModeEnabled) {
           const primary = await getTaskPrimaryModelForSession(api, cfg, runtimeCfg, decision, existingTaskState);
@@ -1567,7 +1534,7 @@ export default function register(api: OpenClawPluginApi) {
             primaryKind: primary.primaryKind,
             primaryModel: primary.primaryModel,
           };
-          taskSessionStateBySession.set(sessionKey, nextTaskState);
+          routingSessionStore.setTaskState(sessionKey, nextTaskState);
 
           await appendJsonl(api, {
             ts: nowIso(),
@@ -1604,8 +1571,8 @@ export default function register(api: OpenClawPluginApi) {
                 allowAutoDowngrade: runtimeCfg.taskModeAllowAutoDowngrade,
               }))
             ) {
-              routeDecisionBySession.delete(sessionKey);
-              taskSessionStateBySession.set(sessionKey, {
+              routingSessionStore.clearRouteDecision(sessionKey);
+              routingSessionStore.setTaskState(sessionKey, {
                 ...nextTaskState,
                 temporaryKind: undefined,
                 temporaryModel: undefined,
@@ -1649,24 +1616,26 @@ export default function register(api: OpenClawPluginApi) {
               logNote = `task mode keep primary ${nextTaskState.primaryKind}(${nextTaskState.primaryModel})`;
             }
 
-            taskSessionStateBySession.set(sessionKey, nextTaskState);
+            routingSessionStore.setTaskState(sessionKey, nextTaskState);
           } else {
             const hadTemporaryModel = Boolean(existingTaskState?.temporaryModel);
-            if (runtimeCfg.taskModeReturnToPrimary && nextTaskState.primaryModel) {
-              targetModel = nextTaskState.primaryModel;
+            const explicitReturnModel = runtimeCfg.taskModeReturnModel.trim();
+            const returnModel = explicitReturnModel || nextTaskState.primaryModel;
+            if (runtimeCfg.taskModeReturnToPrimary && returnModel) {
+              targetModel = returnModel;
               targetKind = nextTaskState.primaryKind;
               logEvent = hadTemporaryModel ? "task_mode_return_to_primary" : "task_mode_primary_kept";
               logNote = hadTemporaryModel
-                ? `task mode return to primary ${nextTaskState.primaryKind}(${nextTaskState.primaryModel})`
-                : `task mode keep primary ${nextTaskState.primaryKind}(${nextTaskState.primaryModel})`;
-              taskSessionStateBySession.set(sessionKey, {
+                ? `task mode return to ${returnModel} for ${nextTaskState.primaryKind}`
+                : `task mode keep return model ${returnModel} for ${nextTaskState.primaryKind}`;
+              routingSessionStore.setTaskState(sessionKey, {
                 ...nextTaskState,
                 temporaryKind: undefined,
                 temporaryModel: undefined,
                 lastRouteAt: Date.now(),
               });
             } else if (!runtimeCfg.freeSwitchWhenTaskModeOff) {
-              routeDecisionBySession.delete(sessionKey);
+              routingSessionStore.clearRouteDecision(sessionKey);
               await appendJsonl(api, {
                 ts: nowIso(),
                 type: "soft_router_suggest",
@@ -1685,7 +1654,7 @@ export default function register(api: OpenClawPluginApi) {
           }
         } else {
           if (!isLongTaskKind(decision.kind)) {
-            routeDecisionBySession.delete(sessionKey);
+            routingSessionStore.clearRouteDecision(sessionKey);
             await appendJsonl(api, {
               ts: nowIso(),
               type: "soft_router_suggest",
@@ -1703,7 +1672,7 @@ export default function register(api: OpenClawPluginApi) {
           }
 
           if (confidenceRank(decision.confidence) < confidenceRank("medium")) {
-            routeDecisionBySession.delete(sessionKey);
+            routingSessionStore.clearRouteDecision(sessionKey);
             await appendJsonl(api, {
               ts: nowIso(),
               type: "soft_router_suggest",
@@ -1722,7 +1691,7 @@ export default function register(api: OpenClawPluginApi) {
           }
 
           if (isConservativeLikelyDowngradeCandidate(decision.candidateModel)) {
-            routeDecisionBySession.delete(sessionKey);
+            routingSessionStore.clearRouteDecision(sessionKey);
             await appendJsonl(api, {
               ts: nowIso(),
               type: "soft_router_suggest",
@@ -1762,7 +1731,7 @@ export default function register(api: OpenClawPluginApi) {
           });
         }
 
-        routeDecisionBySession.delete(sessionKey);
+        routingSessionStore.clearRouteDecision(sessionKey);
 
         try {
           if (norm.normalizedFrom) {
@@ -1888,7 +1857,7 @@ export default function register(api: OpenClawPluginApi) {
 
         if (routeSessionKey) {
           const now = Date.now();
-          routeDecisionBySession.set(routeSessionKey, {
+          routingSessionStore.setRouteDecision(routeSessionKey, {
             sessionKey: routeSessionKey,
             conversationId: ctx.conversationId,
             channelId: ctx.channelId,
