@@ -1,52 +1,11 @@
 {
-  "generatedAt": "2026-03-22T15:58:19.866Z",
+  "generatedAt": "2026-03-22T16:08:05.213Z",
   "summary": {
     "fpTotal": 50,
     "fpFalseCoding": 0,
     "tpTotal": 50,
-    "tpMissedCoding": 2
+    "tpMissedCoding": 0
   },
   "fpFalseCoding": [],
-  "tpMissedCoding": [
-    {
-      "id": "tp-035",
-      "gotKind": "strategy",
-      "score": 4,
-      "confidence": "medium",
-      "text": "Go gin 框架里 context.Context 怎么传递 trace id？",
-      "matchedPositive": [
-        {
-          "set": "strategy.strong",
-          "term": "race",
-          "weight": 3
-        },
-        {
-          "set": "strategy.weak",
-          "term": "race",
-          "weight": 1
-        }
-      ],
-      "matchedRegex": []
-    },
-    {
-      "id": "tp-039",
-      "gotKind": "strategy",
-      "score": 4,
-      "confidence": "medium",
-      "text": "VHDL entity/architecture 写法示例给我一个",
-      "matchedPositive": [
-        {
-          "set": "strategy.strong",
-          "term": "architecture",
-          "weight": 3
-        },
-        {
-          "set": "strategy.weak",
-          "term": "architecture",
-          "weight": 1
-        }
-      ],
-      "matchedRegex": []
-    }
-  ]
+  "tpMissedCoding": []
 }
