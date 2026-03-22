@@ -38,6 +38,7 @@ import {
   type RouteDecision,
   type TaskSessionState,
 } from "../src/routing-session-store.ts";
+import { getRouteTrustDecision } from "../src/routing-trust-policy.ts";
 
 type PluginConfig = {
   enabled?: boolean;
@@ -1494,6 +1495,11 @@ export default function register(api: OpenClawPluginApi) {
           messageHash: promptHash,
         });
         const decision = match.decision;
+        const trust = getRouteTrustDecision({
+          matchSource: match.source,
+          runtimeIdentitySource: runtimeIdentity.source,
+          decision,
+        });
         if (!decision) {
           await appendJsonl(api, {
             ts: nowIso(),
@@ -1507,6 +1513,8 @@ export default function register(api: OpenClawPluginApi) {
             agentId,
             matchSource: match.source,
             runtimeIdentitySource: runtimeIdentity.source,
+            trustLevel: trust.level,
+            trustReason: trust.reason,
           });
           return;
         }
@@ -1526,6 +1534,32 @@ export default function register(api: OpenClawPluginApi) {
             agentId,
             matchSource: match.source,
             runtimeIdentitySource: runtimeIdentity.source,
+            trustLevel: trust.level,
+            trustReason: trust.reason,
+            messageHash: decision.messageHash,
+          });
+          return;
+        }
+
+        if (!trust.trusted) {
+          await appendJsonl(api, {
+            ts: nowIso(),
+            type: "soft_router_suggest",
+            event: "route_cache_untrusted",
+            pid: process.pid,
+            dryRun: true,
+            sessionKey,
+            matchedSessionKey: match.matchedSessionKey,
+            attemptedConversationId,
+            attemptedMessageHash: promptHash,
+            agentId,
+            matchSource: match.source,
+            runtimeIdentitySource: runtimeIdentity.source,
+            trustLevel: trust.level,
+            trustReason: trust.reason,
+            kind: decision.kind,
+            confidence: decision.confidence,
+            candidateModel: decision.candidateModel,
             messageHash: decision.messageHash,
           });
           return;
@@ -1546,6 +1580,9 @@ export default function register(api: OpenClawPluginApi) {
           attemptedMessageHash: promptHash,
           agentId,
           matchSource: match.source,
+          runtimeIdentitySource: runtimeIdentity.source,
+          trustLevel: trust.level,
+          trustReason: trust.reason,
           kind: decision.kind,
           confidence: decision.confidence,
           candidateModel: decision.candidateModel,

@@ -52,6 +52,20 @@
 - `ctx.chatId` / `ctx.chat_id`
 - fallback `runtime-fallback:${provider}:${accountId}`
 
+但自动 override 不再对所有命中一视同仁，而是按可信度分层：
+
+- **strong**：允许 override
+- **medium**：允许 override，但需要持续观察真实日志占比
+- **weak**：只记录，不 override
+- **none**：直接 miss
+
+当前口径：
+
+- `matchSource=sessionKey` 且 runtime identity 非 fallback => strong
+- `matchSource=conversationId` => medium
+- `matchSource=messageHash` => weak
+- `runtimeIdentitySource=fallback` => weak
+
 如果未来 OpenClaw hook 上下文字段增强，应优先继续强化这里的 session 对齐能力。
 
 ## 结论

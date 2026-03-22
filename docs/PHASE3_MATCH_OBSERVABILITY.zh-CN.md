@@ -27,6 +27,8 @@ findRouteDecisionMatch({ sessionKey, conversationId, messageHash })
 - `matchedSessionKey`
 - `runtimeSessionKey`
 - `runtimeIdentitySource`
+- `trustLevel`
+- `trustReason`
 - `attemptedConversationId`
 - `attemptedMessageHash`
 
@@ -36,6 +38,13 @@ findRouteDecisionMatch({ sessionKey, conversationId, messageHash })
 - `sessionKey`
 - `conversationId`
 - `messageHash`
+
+新增事件：
+
+- `route_cache_untrusted`
+  - 表示 store 里找到了 decision
+  - 但当前命中链只达到弱可信度
+  - 因此只记录，不执行 override
 
 ### 关键事件
 
