@@ -4,7 +4,7 @@ import type {
   SessionSummaryDTO,
 } from "./routing-state-dto.js";
 
-export type ControlApiErrorCode = "invalid_argument" | "not_found";
+export type ControlApiErrorCode = "invalid_argument" | "not_found" | "method_not_allowed";
 
 export type ControlApiError = {
   code: ControlApiErrorCode;
