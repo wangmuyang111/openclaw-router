@@ -25,6 +25,7 @@ import { promisify } from "node:util";
 import { loadAndCompileRoutingRules } from "./keyword-library.ts";
 import { routeByWeightedRules } from "./weighted-routing-engine.ts";
 import { resolveRouteSessionKey } from "../src/route-session-key.ts";
+import { resolveRuntimeRouteSessionKey } from "../src/routing-session-key.runtime.ts";
 import {
   RoutingSessionStore,
   type Confidence,
@@ -1455,14 +1456,23 @@ export default function register(api: OpenClawPluginApi) {
 
         const promptText = String(event.prompt ?? "");
         const ctxAny = ctx as any;
-        const sessionKey = String(
-          ctxAny?.sessionKey ?? ctxAny?.threadId ?? ctxAny?.conversationId ?? ctx.conversationId ?? "unknown",
-        );
+        const sessionKey = resolveRuntimeRouteSessionKey({
+          sessionKey: ctxAny?.sessionKey,
+          sessionId: ctxAny?.sessionId,
+          conversationId: ctxAny?.conversationId ?? ctx.conversationId,
+          channelId: ctx.channelId,
+          accountId: ctx.accountId,
+          messageProvider: ctxAny?.messageProvider,
+        });
         const promptHash = crypto.createHash("sha1").update(promptText).digest("hex").slice(0, 16);
         const agentId = ctxAny?.agentId;
         const runtimeCfg = await getRuntimeRoutingConfig(api);
 
-        const decision = routingSessionStore.getRouteDecision(sessionKey);
+        const decision = routingSessionStore.findRouteDecision({
+          sessionKey,
+          conversationId: String(ctxAny?.conversationId ?? ctx.conversationId ?? "").trim() || undefined,
+          messageHash: promptHash,
+        });
         if (!decision) {
           await appendJsonl(api, {
             ts: nowIso(),

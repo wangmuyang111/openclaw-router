@@ -39,6 +39,8 @@ export type SessionStateEntry = {
 
 export class RoutingSessionStore {
   private readonly sessions = new Map<string, SessionRoutingState>();
+  private readonly decisionByConversationId = new Map<string, string>();
+  private readonly decisionByMessageHash = new Map<string, string>();
 
   listSessionKeys(): string[] {
     return Array.from(this.sessions.keys());
@@ -56,14 +58,50 @@ export class RoutingSessionStore {
     return this.sessions.get(sessionKey)?.routeDecision;
   }
 
+  findRouteDecision(match: {
+    sessionKey?: string;
+    conversationId?: string;
+    messageHash?: string;
+  }): RouteDecision | undefined {
+    const sessionKey = String(match.sessionKey ?? "").trim();
+    if (sessionKey) {
+      const direct = this.getRouteDecision(sessionKey);
+      if (direct) return direct;
+    }
+
+    const conversationId = String(match.conversationId ?? "").trim();
+    if (conversationId) {
+      const matchedSessionKey = this.decisionByConversationId.get(conversationId);
+      if (matchedSessionKey) {
+        const byConversation = this.getRouteDecision(matchedSessionKey);
+        if (byConversation) return byConversation;
+      }
+    }
+
+    const messageHash = String(match.messageHash ?? "").trim();
+    if (messageHash) {
+      const matchedSessionKey = this.decisionByMessageHash.get(messageHash);
+      if (matchedSessionKey) {
+        const byMessageHash = this.getRouteDecision(matchedSessionKey);
+        if (byMessageHash) return byMessageHash;
+      }
+    }
+
+    return undefined;
+  }
+
   setRouteDecision(sessionKey: string, decision: RouteDecision): void {
     const current = this.sessions.get(sessionKey) ?? {};
+    const previous = current.routeDecision;
+    if (previous) this.unindexDecision(previous);
     this.sessions.set(sessionKey, { ...current, routeDecision: decision });
+    this.indexDecision(decision);
   }
 
   clearRouteDecision(sessionKey: string): void {
     const current = this.sessions.get(sessionKey);
     if (!current?.routeDecision) return;
+    this.unindexDecision(current.routeDecision);
     const next: SessionRoutingState = { ...current, routeDecision: undefined };
     this.compactOrSet(sessionKey, next);
   }
@@ -90,11 +128,32 @@ export class RoutingSessionStore {
       const decision = state.routeDecision;
       if (decision && decision.expiresAtMs <= now) {
         removed.push(sessionKey);
+        this.unindexDecision(decision);
         const next: SessionRoutingState = { ...state, routeDecision: undefined };
         this.compactOrSet(sessionKey, next);
       }
     }
     return removed;
+  }
+
+  private indexDecision(decision: RouteDecision): void {
+    const conversationId = String(decision.conversationId ?? "").trim();
+    if (conversationId) this.decisionByConversationId.set(conversationId, decision.sessionKey);
+
+    const messageHash = String(decision.messageHash ?? "").trim();
+    if (messageHash) this.decisionByMessageHash.set(messageHash, decision.sessionKey);
+  }
+
+  private unindexDecision(decision: RouteDecision): void {
+    const conversationId = String(decision.conversationId ?? "").trim();
+    if (conversationId && this.decisionByConversationId.get(conversationId) === decision.sessionKey) {
+      this.decisionByConversationId.delete(conversationId);
+    }
+
+    const messageHash = String(decision.messageHash ?? "").trim();
+    if (messageHash && this.decisionByMessageHash.get(messageHash) === decision.sessionKey) {
+      this.decisionByMessageHash.delete(messageHash);
+    }
   }
 
   private compactOrSet(sessionKey: string, state: SessionRoutingState): void {

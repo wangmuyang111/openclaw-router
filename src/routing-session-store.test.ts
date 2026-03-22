@@ -10,6 +10,7 @@ import {
 function makeDecision(sessionKey: string, expiresAtMs: number): RouteDecision {
   return {
     sessionKey,
+    conversationId: `${sessionKey}-conversation`,
     messageHash: `${sessionKey}-hash`,
     kind: "coding",
     confidence: "high",
@@ -71,4 +72,17 @@ test("RoutingSessionStore lists session keys and state entries", () => {
     store.listSessionStates().map((item) => item.sessionKey),
     ["b", "a"],
   );
+});
+
+test("RoutingSessionStore can find route decision by conversationId or messageHash", () => {
+  const store = new RoutingSessionStore();
+  const decision = makeDecision("s1", 20_000);
+
+  store.setRouteDecision("s1", decision);
+
+  assert.equal(
+    store.findRouteDecision({ conversationId: "s1-conversation" })?.sessionKey,
+    "s1",
+  );
+  assert.equal(store.findRouteDecision({ messageHash: "s1-hash" })?.sessionKey, "s1");
 });
