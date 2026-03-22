@@ -89,13 +89,13 @@
 - Step 1：基本完成
 - Step 2：已完成（已引入 trusted/untrusted 分层命中）
 - Step 3：未完成（仍需真实多窗口灰度日志）
-- Step 4：部分完成（build 与核心定向测试已通过）
-- Step 5：已识别阻塞但未完成
+- Step 4：已完成（`npm test` 与 `npm run test:sticky` 均已通过）
+- Step 5：进行中
 
 当前明确阻塞：
 
-- `test:sticky` 的假红已定位并修正：原脚本错误指向旧的 `dist/src/...` 产物路径
-- 最新产物下，sticky 回归测试已通过
-- 因此当前主要剩余阻塞不再是 sticky 语义本身，而是：
+- sticky 语义层已不再构成阻塞
+- build/test 链已收口：测试前会先 clean，避免旧 `dist/src/...` 产物制造假红
+- 因此当前主要剩余阻塞聚焦为：
   - 真实多窗口灰度日志尚未完成
   - 发布前最终收口尚未完成
