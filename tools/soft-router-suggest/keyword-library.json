@@ -1,8 +1,8 @@
 {
   "$schema": "./keyword-library.schema.json",
   "version": 1,
-  "updatedAt": "2026-03-22T15:27:04.673Z",
-  "notes": "Simplified to 6 categories: strategy, coding, vision, support, general, chat. strategy merges planning + advanced_coding; support merges daily_support + emergency_fallback; quick_response keywords were fully preserved by merging into support/general/chat.\n[scheme B] move ambiguous short tokens (pip/CI/pipeline) out of contains sets; reintroduce via regex word-boundary/context patterns.\n[sync] merged coding keyword draft (coding关键词库.txt part1/2/3/4) keywordSets into keyword-library.json (sets only; not auto-wired).",
+  "updatedAt": "2026-03-22T15:38:19.128Z",
+  "notes": "Simplified to 6 categories: strategy, coding, vision, support, general, chat. strategy merges planning + advanced_coding; support merges daily_support + emergency_fallback; quick_response keywords were fully preserved by merging into support/general/chat.\n[scheme B] move ambiguous short tokens (pip/CI/pipeline) out of contains sets; reintroduce via regex word-boundary/context patterns.\n[sync] merged coding keyword draft (coding关键词库.txt part1/2/3/4) keywordSets into keyword-library.json (sets only; not auto-wired).\n[cleanup] remove ambiguous tokens CI/pipeline from coding.feature.build_and_toolchain (handled by regex/safer phrases).\n[wiring] add coding.feature.package_files and coding.feature.build_and_toolchain to kinds.coding positive (weight=2).",
   "defaultFallbackKind": "chat",
   "normalization": {
     "lowercase": true,
@@ -1309,9 +1309,7 @@
       "exit code",
       "command not found",
       "permission denied",
-      "CI",
-      "GitHub Actions",
-      "pipeline"
+      "GitHub Actions"
     ],
     "coding.feature.package_files": [
       "package.json",
@@ -2146,6 +2144,16 @@
           {
             "set": "coding.weak",
             "weight": 1,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.package_files",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.build_and_toolchain",
+            "weight": 2,
             "match": "contains"
           }
         ],
