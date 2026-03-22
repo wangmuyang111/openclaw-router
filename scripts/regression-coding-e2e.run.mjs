@@ -1,0 +1,296 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+function normalizeContent(s) {
+  const raw = String(s ?? "");
+  return { raw, lower: raw.toLowerCase() };
+}
+
+function hasImage(metadata) {
+  return metadata?.hasImage === true || String(metadata?.mediaType ?? "").toLowerCase().includes("image");
+}
+
+function hasCodeBlock(content) {
+  return String(content ?? "").includes("```");
+}
+
+function contentContains(content, term) {
+  if (!term) return false;
+  return content.raw.includes(term) || content.lower.includes(String(term).toLowerCase());
+}
+
+function isStrongGroup(group) {
+  return group.weight >= 3 || String(group.sourceSet ?? "").endsWith(".strong");
+}
+
+function scoreKind(kind, content, metadata) {
+  let score = 0;
+  let strongHits = 0;
+  let hits = 0;
+  const matched = { positive: [], negative: [], metadata: [], regex: [] };
+  const signals = [];
+
+  for (const m of kind.metadata ?? []) {
+    const val =
+      m.field === "hasImage" ? hasImage(metadata) : m.field === "hasCodeBlock" ? hasCodeBlock(content.raw) : false;
+    if (val === m.equals) {
+      if (m.exclude) return { eligible: false, score: 0, strongHits: 0, hits: 0, matched, signals: [] };
+      score += m.weight;
+      hits += 1;
+      matched.metadata.push({ field: m.field, weight: m.weight });
+      signals.push(`meta:${m.field}(${m.weight})`);
+    }
+  }
+
+  // Regex signals: weight>=3 counts as strongHit
+  for (const r of kind.regex ?? []) {
+    if (!r.pattern) continue;
+    try {
+      const re = new RegExp(r.pattern, r.flags ?? "i");
+      if (re.test(content.raw)) {
+        score += r.weight;
+        hits += 1;
+        if (r.weight >= 3) strongHits += 1;
+        matched.regex.push({ pattern: r.pattern, weight: r.weight });
+        signals.push(`re:${r.pattern}(${r.weight})`);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  for (const group of kind.positive ?? []) {
+    for (const term of group.keywords ?? []) {
+      if (!term) continue;
+      if (contentContains(content, term)) {
+        if (group.exclude) return { eligible: false, score: 0, strongHits: 0, hits: 0, matched, signals: [] };
+        score += group.weight;
+        hits += 1;
+        if (isStrongGroup(group)) strongHits += 1;
+        matched.positive.push({ set: group.sourceSet, term, weight: group.weight });
+        signals.push(`+${group.weight}:${group.sourceSet}`);
+      }
+    }
+  }
+
+  for (const group of kind.negative ?? []) {
+    for (const term of group.keywords ?? []) {
+      if (!term) continue;
+      if (contentContains(content, term)) {
+        if (group.exclude) return { eligible: false, score: 0, strongHits: 0, hits: 0, matched, signals: [] };
+        score += group.weight;
+        hits += 1;
+        matched.negative.push({ set: group.sourceSet, term, weight: group.weight });
+        signals.push(`${group.weight}:${group.sourceSet}`);
+      }
+    }
+  }
+
+  const minStrongHits = kind.thresholds?.minStrongHits ?? 0;
+  const minScore = kind.thresholds?.minScore ?? 2;
+  if (strongHits < minStrongHits) return { eligible: false, score, strongHits, hits, matched, signals };
+  if (score < minScore) return { eligible: false, score, strongHits, hits, matched, signals };
+
+  return { eligible: true, score, strongHits, hits, matched, signals };
+}
+
+function routeByWeightedRules(params) {
+  const maxExplainTerms = params.maxExplainTerms ?? 10;
+  const contentN = normalizeContent(params.content);
+
+  const fallbackKindId = String(params.rules.defaultFallbackKind ?? "chat").trim() || "chat";
+
+  const enabledKinds = (params.rules.kinds ?? [])
+    .filter((k) => k.enabled !== false)
+    .filter((k) => k.id !== "chat")
+    .filter((k) => k.id !== fallbackKindId);
+
+  let best = null;
+  for (const k of enabledKinds) {
+    const scored = scoreKind(k, contentN, params.metadata);
+    if (!scored.eligible) continue;
+    if (!best) {
+      best = { kind: k, scored };
+      continue;
+    }
+    if (scored.score > best.scored.score) {
+      best = { kind: k, scored };
+      continue;
+    }
+    if (scored.score === best.scored.score && (k.priority ?? 0) > (best.kind.priority ?? 0)) {
+      best = { kind: k, scored };
+    }
+  }
+
+  if (!best) {
+    return {
+      kind: fallbackKindId,
+      confidence: "low",
+      score: 0,
+      strongHits: 0,
+      hits: 0,
+      reason: "No non-fallback kind met thresholds; using fallback.",
+      signals: ["fallback:no_match"],
+      matched: { positive: [], negative: [], metadata: [], regex: [] },
+    };
+  }
+
+  const t = best.kind.thresholds;
+  const thresholds = {
+    minScore: t?.minScore ?? 2,
+    highScore: t?.highScore ?? 6,
+  };
+  const conf = best.scored.score >= thresholds.highScore ? "high" : best.scored.score >= thresholds.minScore ? "medium" : "low";
+
+  const mp = best.scored.matched.positive.slice(0, maxExplainTerms);
+  const mn = best.scored.matched.negative.slice(0, maxExplainTerms);
+
+  return {
+    kind: best.kind.id,
+    confidence: conf,
+    score: best.scored.score,
+    strongHits: best.scored.strongHits,
+    hits: best.scored.hits,
+    reason: `Weighted match: kind='${best.kind.id}' score=${best.scored.score} strongHits=${best.scored.strongHits} hits=${best.scored.hits} confidence=${conf}`,
+    signals: best.scored.signals.slice(0, 30),
+    matched: { positive: mp, negative: mn, metadata: best.scored.matched.metadata, regex: best.scored.matched.regex },
+  };
+}
+
+function applySetOverlay(base, add, remove) {
+  const rm = new Set((remove ?? []).map((x) => String(x).trim()).filter(Boolean));
+  const out = [];
+  for (const x of base ?? []) {
+    const t = String(x).trim();
+    if (!t) continue;
+    if (rm.has(t)) continue;
+    out.push(t);
+  }
+  for (const x of add ?? []) {
+    const t = String(x).trim();
+    if (!t) continue;
+    out.push(t);
+  }
+  const seen = new Set();
+  const dedup = [];
+  for (const x of out) {
+    if (seen.has(x)) continue;
+    seen.add(x);
+    dedup.push(x);
+  }
+  return dedup;
+}
+
+function compileKeywordLibrary(lib, overrides) {
+  const warnings = [];
+
+  const finalSets = {};
+  for (const [setId, baseList] of Object.entries(lib.keywordSets ?? {})) {
+    const overlay = overrides?.sets?.[setId];
+    finalSets[setId] = applySetOverlay(baseList ?? [], overlay?.add, overlay?.remove);
+  }
+
+  const defaultFallbackKind = String(lib.defaultFallbackKind ?? "chat");
+
+  const compiledKinds = [];
+  for (const [kindId, k] of Object.entries(lib.kinds ?? {})) {
+    const enabledBase = k.enabled !== false;
+    const enabledOverride = overrides?.kinds?.[kindId]?.enabled;
+    const enabled = typeof enabledOverride === "boolean" ? enabledOverride : enabledBase;
+
+    const expand = (arr) => {
+      const out = [];
+      for (const s of arr ?? []) {
+        const setId = String(s.set ?? "");
+        if (!setId) continue;
+        const kw = finalSets[setId];
+        if (!kw) {
+          warnings.push(`kind '${kindId}': missing keyword set '${setId}'`);
+          continue;
+        }
+        out.push({ keywords: kw, weight: Number(s.weight ?? 0), match: "contains", exclude: Boolean(s.exclude), sourceSet: setId });
+      }
+      return out;
+    };
+
+    const thresholds = {
+      minScore: Number(k.thresholds?.minScore ?? 2),
+      highScore: Number(k.thresholds?.highScore ?? 6),
+      minStrongHits: Math.max(0, Math.trunc(Number(k.thresholds?.minStrongHits ?? 0))),
+    };
+
+    compiledKinds.push({
+      id: String(k.id ?? kindId),
+      name: k.name ?? kindId,
+      priority: Math.trunc(Number(k.priority ?? 0)),
+      enabled,
+      positive: expand(k.signals?.positive),
+      negative: expand(k.signals?.negative),
+      metadata: (k.signals?.metadata ?? []).map((m) => ({
+        field: m.field,
+        equals: Boolean(m.equals),
+        weight: Number(m.weight ?? 0),
+        exclude: Boolean(m.exclude),
+      })),
+      regex: (k.signals?.regex ?? []).map((r) => ({
+        pattern: String(r.pattern ?? ""),
+        flags: String(r.flags ?? "i"),
+        weight: Number(r.weight ?? 0),
+      })),
+      thresholds,
+      models: { strategy: "priority_list", list: Array.isArray(k.models?.list) ? k.models.list : [] },
+    });
+  }
+
+  compiledKinds.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+  return { compiled: { version: 1, compiledAt: new Date().toISOString(), defaultFallbackKind, kinds: compiledKinds }, warnings };
+}
+
+function main() {
+  const repoRootUrl = new URL("..", import.meta.url);
+  const repoRoot = fileURLToPath(repoRootUrl);
+
+  const libPath = path.join(repoRoot, "tools", "soft-router-suggest", "keyword-library.json");
+  const fpPath = path.join(repoRoot, "scripts", "regression-coding-fp.samples.json");
+  const tpPath = path.join(repoRoot, "scripts", "regression-coding-tp.samples.json");
+
+  const lib = JSON.parse(fs.readFileSync(libPath, "utf8"));
+  const fp = JSON.parse(fs.readFileSync(fpPath, "utf8"));
+  const tp = JSON.parse(fs.readFileSync(tpPath, "utf8"));
+
+  const { compiled } = compileKeywordLibrary(lib, null);
+
+  const run = (samples) => {
+    const out = [];
+    for (const s of samples) {
+      const d = routeByWeightedRules({ rules: compiled, content: s.text, metadata: {} });
+      out.push({ id: s.id, expectKind: s.expectKind, expectNotKind: s.expectNotKind, gotKind: d.kind, score: d.score, confidence: d.confidence, text: s.text, matched: d.matched });
+    }
+    return out;
+  };
+
+  const fpRun = run(fp);
+  const tpRun = run(tp);
+
+  const fpFails = fpRun.filter((x) => x.gotKind === "coding");
+  const tpFails = tpRun.filter((x) => x.gotKind !== "coding");
+
+  const report = {
+    generatedAt: new Date().toISOString(),
+    summary: {
+      fpTotal: fpRun.length,
+      fpFalseCoding: fpFails.length,
+      tpTotal: tpRun.length,
+      tpMissedCoding: tpFails.length,
+    },
+    fpFalseCoding: fpFails.map((x) => ({ id: x.id, gotKind: x.gotKind, score: x.score, confidence: x.confidence, text: x.text, matchedPositive: x.matched.positive.slice(0, 8), matchedRegex: x.matched.regex })),
+    tpMissedCoding: tpFails.map((x) => ({ id: x.id, gotKind: x.gotKind, score: x.score, confidence: x.confidence, text: x.text, matchedPositive: x.matched.positive.slice(0, 8), matchedRegex: x.matched.regex })),
+  };
+
+  const outPath = path.join(repoRoot, "scripts", "regression-coding-e2e.report.json");
+  fs.writeFileSync(outPath, JSON.stringify(report, null, 2) + "\n", "utf8");
+  console.log(outPath);
+}
+
+main();

@@ -1,8 +1,8 @@
 {
   "$schema": "./keyword-library.schema.json",
   "version": 1,
-  "updatedAt": "2026-03-22T15:38:19.128Z",
-  "notes": "Simplified to 6 categories: strategy, coding, vision, support, general, chat. strategy merges planning + advanced_coding; support merges daily_support + emergency_fallback; quick_response keywords were fully preserved by merging into support/general/chat.\n[scheme B] move ambiguous short tokens (pip/CI/pipeline) out of contains sets; reintroduce via regex word-boundary/context patterns.\n[sync] merged coding keyword draft (coding关键词库.txt part1/2/3/4) keywordSets into keyword-library.json (sets only; not auto-wired).\n[cleanup] remove ambiguous tokens CI/pipeline from coding.feature.build_and_toolchain (handled by regex/safer phrases).\n[wiring] add coding.feature.package_files and coding.feature.build_and_toolchain to kinds.coding positive (weight=2).",
+  "updatedAt": "2026-03-22T15:58:10.395Z",
+  "notes": "Simplified to 6 categories: strategy, coding, vision, support, general, chat. strategy merges planning + advanced_coding; support merges daily_support + emergency_fallback; quick_response keywords were fully preserved by merging into support/general/chat.\n[scheme B] move ambiguous short tokens (pip/CI/pipeline) out of contains sets; reintroduce via regex word-boundary/context patterns.\n[sync] merged coding keyword draft (coding关键词库.txt part1/2/3/4) keywordSets into keyword-library.json (sets only; not auto-wired).\n[cleanup] remove ambiguous tokens CI/pipeline from coding.feature.build_and_toolchain (handled by regex/safer phrases).\n[wiring] add coding.feature.package_files and coding.feature.build_and_toolchain to kinds.coding positive (weight=2).\n[fix] normalize regex pattern escape level (\\\\ -> \\) so RegExp() receives real regex escapes.\n[tune] set coding.minStrongHits=0 to improve recall for file/tooling signals.\n[tune] restore coding.minStrongHits=1 (use *.strong set ids to satisfy strongHit without raising weight).\n[tune] mark package_files/build_and_toolchain as strong by using *.strong set ids (counts as strongHit).\n[conservative] add small safe strong coding set for framework/tooling-specific terms (weight=2).",
   "defaultFallbackKind": "chat",
   "normalization": {
     "lowercase": true,
@@ -1073,18 +1073,18 @@
       "comprehensively"
     ],
     "coding.regex.strong": [
-      "\\\\bpip\\\\b",
-      "\\\\bCI\\\\b",
-      "\\\\b(?:CI\\/CD|CI|build|deploy)\\\\s+pipeline\\\\b",
-      "\\\\bTS\\\\d{4}\\\\b",
-      "\\\\bCS\\\\d{4}\\\\b",
-      "\\\\bORA-\\\\d{4,5}\\\\b",
-      "\\\\bSQLSTATE\\\\b"
+      "\\bpip\\b",
+      "\\bCI\\b",
+      "\\b(?:CI\\/CD|CI|build|deploy)\\s+pipeline\\b",
+      "\\bTS\\d{4}\\b",
+      "\\bCS\\d{4}\\b",
+      "\\bORA-\\d{4,5}\\b",
+      "\\bSQLSTATE\\b"
     ],
     "coding.regex.medium": [
-      "^npm\\\\s+ERR!",
-      "^Traceback \\\\(most recent call last\\\\):",
-      "\\\\berror\\\\[E\\\\d{4}\\\\]"
+      "^npm\\s+ERR!",
+      "^Traceback \\(most recent call last\\):",
+      "\\berror\\[E\\d{4}\\]"
     ],
     "coding.lang.full": [
       "C language",
@@ -2084,6 +2084,78 @@
       "./gradlew",
       "gradlew.bat",
       "mvnw.cmd"
+    ],
+    "coding.feature.package_files.strong": [
+      "package.json",
+      "package-lock.json",
+      "yarn.lock",
+      "pnpm-lock.yaml",
+      "tsconfig.json",
+      "pyproject.toml",
+      "requirements.txt",
+      "Pipfile",
+      "Pipfile.lock",
+      "poetry.lock",
+      "go.mod",
+      "go.sum",
+      "Cargo.toml",
+      "Cargo.lock",
+      "pom.xml",
+      "build.gradle",
+      "build.gradle.kts",
+      ".csproj",
+      ".sln",
+      "composer.json",
+      "Gemfile",
+      "Gemfile.lock",
+      "CMakeLists.txt",
+      "Makefile",
+      "docker-compose.yml",
+      "Dockerfile"
+    ],
+    "coding.feature.build_and_toolchain.strong": [
+      "build failed",
+      "compilation failed",
+      "linker",
+      "linking",
+      "ld: ",
+      "undefined reference to",
+      "fatal error:",
+      "stack trace",
+      "stacktrace",
+      "Traceback (most recent call last):",
+      "Segmentation fault",
+      "segmentation fault",
+      "core dumped",
+      "exit code",
+      "command not found",
+      "permission denied",
+      "GitHub Actions"
+    ],
+    "coding.conservative.safe.strong": [
+      "useEffect",
+      "setState",
+      "FastAPI",
+      "pydantic",
+      "set -euo pipefail",
+      "pipefail",
+      "pragma solidity",
+      "uint256",
+      "mapping(",
+      "Verilog",
+      "endmodule",
+      "always @(",
+      "VHDL",
+      "cargo fmt",
+      "clippy",
+      "GraphQL schema",
+      "EXPLAIN ANALYZE",
+      "Helm chart",
+      "values.yaml",
+      "git rebase",
+      "merge conflict",
+      "LINQ",
+      "IEnumerable"
     ]
   },
   "kinds": {
@@ -2147,12 +2219,17 @@
             "match": "contains"
           },
           {
-            "set": "coding.feature.package_files",
+            "set": "coding.feature.package_files.strong",
             "weight": 2,
             "match": "contains"
           },
           {
-            "set": "coding.feature.build_and_toolchain",
+            "set": "coding.feature.build_and_toolchain.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.conservative.safe.strong",
             "weight": 2,
             "match": "contains"
           }
@@ -2175,52 +2252,52 @@
         ],
         "regex": [
           {
-            "pattern": "\\\\bpip\\\\b",
+            "pattern": "\\bpip\\b",
             "flags": "i",
             "weight": 3
           },
           {
-            "pattern": "\\\\bCI\\\\b",
+            "pattern": "\\bCI\\b",
             "flags": "i",
             "weight": 3
           },
           {
-            "pattern": "\\\\b(?:CI\\/CD|CI|build|deploy)\\\\s+pipeline\\\\b",
+            "pattern": "\\b(?:CI\\/CD|CI|build|deploy)\\s+pipeline\\b",
             "flags": "i",
             "weight": 3
           },
           {
-            "pattern": "\\\\bTS\\\\d{4}\\\\b",
+            "pattern": "\\bTS\\d{4}\\b",
             "flags": "i",
             "weight": 3
           },
           {
-            "pattern": "\\\\bCS\\\\d{4}\\\\b",
+            "pattern": "\\bCS\\d{4}\\b",
             "flags": "i",
             "weight": 3
           },
           {
-            "pattern": "\\\\bORA-\\\\d{4,5}\\\\b",
+            "pattern": "\\bORA-\\d{4,5}\\b",
             "flags": "i",
             "weight": 3
           },
           {
-            "pattern": "\\\\bSQLSTATE\\\\b",
+            "pattern": "\\bSQLSTATE\\b",
             "flags": "i",
             "weight": 3
           },
           {
-            "pattern": "^npm\\\\s+ERR!",
+            "pattern": "^npm\\s+ERR!",
             "flags": "i",
             "weight": 2
           },
           {
-            "pattern": "^Traceback \\\\(most recent call last\\\\):",
+            "pattern": "^Traceback \\(most recent call last\\):",
             "flags": "i",
             "weight": 2
           },
           {
-            "pattern": "\\\\berror\\\\[E\\\\d{4}\\\\]",
+            "pattern": "\\berror\\[E\\d{4}\\]",
             "flags": "i",
             "weight": 2
           }
