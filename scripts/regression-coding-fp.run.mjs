@@ -43,6 +43,8 @@ function scoreKind(kind, content, metadata) {
     }
   }
 
+  // Regex signals
+  // Convention: weight>=3 counts as a "strong" hit (similar to strong keyword groups)
   for (const r of kind.regex ?? []) {
     if (!r.pattern) continue;
     try {
@@ -50,6 +52,7 @@ function scoreKind(kind, content, metadata) {
       if (re.test(content.raw)) {
         score += r.weight;
         hits += 1;
+        if (r.weight >= 3) strongHits += 1;
         matched.regex.push({ pattern: r.pattern, weight: r.weight });
         signals.push(`re:${r.pattern}(${r.weight})`);
       }

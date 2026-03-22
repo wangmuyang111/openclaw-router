@@ -1,8 +1,8 @@
 {
   "$schema": "./keyword-library.schema.json",
   "version": 1,
-  "updatedAt": "2026-03-19T04:31:55.2540363Z",
-  "notes": "Simplified to 6 categories: strategy, coding, vision, support, general, chat. strategy merges planning + advanced_coding; support merges daily_support + emergency_fallback; quick_response keywords were fully preserved by merging into support/general/chat.",
+  "updatedAt": "2026-03-22T15:12:44.930Z",
+  "notes": "Simplified to 6 categories: strategy, coding, vision, support, general, chat. strategy merges planning + advanced_coding; support merges daily_support + emergency_fallback; quick_response keywords were fully preserved by merging into support/general/chat.\n[scheme B] move ambiguous short tokens (pip/CI/pipeline) out of contains sets; reintroduce via regex word-boundary/context patterns.",
   "defaultFallbackKind": "chat",
   "normalization": {
     "lowercase": true,
@@ -28,11 +28,8 @@
       "tsc",
       "lint",
       "typecheck",
-      "CI",
-      "pipeline",
       "npm",
       "pnpm",
-      "pip",
       "poetry",
       "conda",
       "```",
@@ -44,7 +41,11 @@
       "bug",
       "AssertionError",
       "ImportError",
-      "EADDRINUSE"
+      "EADDRINUSE",
+      "pip install",
+      "pip3 install",
+      "CI/CD",
+      "GitHub Actions"
     ],
     "coding.weak": [
       "编程",
@@ -126,8 +127,6 @@
       "compile",
       "compilation",
       "build failed",
-      "CI",
-      "pipeline",
       "workflow",
       "artifact",
       "lint",
@@ -136,7 +135,6 @@
       "npm",
       "pnpm",
       "yarn",
-      "pip",
       "poetry",
       "conda",
       "lockfile",
@@ -223,7 +221,11 @@
       "优化",
       "optimization",
       "issue",
-      "shell"
+      "shell",
+      "python -m pip",
+      "CI/CD",
+      "CI pipeline",
+      "build pipeline"
     ],
     "coding.negative": [
       "招聘",
@@ -1069,6 +1071,20 @@
       "in-depth",
       "comprehensive",
       "comprehensively"
+    ],
+    "coding.regex.strong": [
+      "\\\\bpip\\\\b",
+      "\\\\bCI\\\\b",
+      "\\\\b(?:CI\\/CD|CI|build|deploy)\\\\s+pipeline\\\\b",
+      "\\\\bTS\\\\d{4}\\\\b",
+      "\\\\bCS\\\\d{4}\\\\b",
+      "\\\\bORA-\\\\d{4,5}\\\\b",
+      "\\\\bSQLSTATE\\\\b"
+    ],
+    "coding.regex.medium": [
+      "^npm\\\\s+ERR!",
+      "^Traceback \\\\(most recent call last\\\\):",
+      "\\\\berror\\\\[E\\\\d{4}\\\\]"
     ]
   },
   "kinds": {
@@ -1148,7 +1164,58 @@
             "exclude": false
           }
         ],
-        "regex": []
+        "regex": [
+          {
+            "pattern": "\\\\bpip\\\\b",
+            "flags": "i",
+            "weight": 3
+          },
+          {
+            "pattern": "\\\\bCI\\\\b",
+            "flags": "i",
+            "weight": 3
+          },
+          {
+            "pattern": "\\\\b(?:CI\\/CD|CI|build|deploy)\\\\s+pipeline\\\\b",
+            "flags": "i",
+            "weight": 3
+          },
+          {
+            "pattern": "\\\\bTS\\\\d{4}\\\\b",
+            "flags": "i",
+            "weight": 3
+          },
+          {
+            "pattern": "\\\\bCS\\\\d{4}\\\\b",
+            "flags": "i",
+            "weight": 3
+          },
+          {
+            "pattern": "\\\\bORA-\\\\d{4,5}\\\\b",
+            "flags": "i",
+            "weight": 3
+          },
+          {
+            "pattern": "\\\\bSQLSTATE\\\\b",
+            "flags": "i",
+            "weight": 3
+          },
+          {
+            "pattern": "^npm\\\\s+ERR!",
+            "flags": "i",
+            "weight": 2
+          },
+          {
+            "pattern": "^Traceback \\\\(most recent call last\\\\):",
+            "flags": "i",
+            "weight": 2
+          },
+          {
+            "pattern": "\\\\berror\\\\[E\\\\d{4}\\\\]",
+            "flags": "i",
+            "weight": 2
+          }
+        ]
       },
       "thresholds": {
         "minScore": 2,
