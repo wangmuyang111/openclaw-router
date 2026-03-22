@@ -1,6 +1,6 @@
 {
   "title": "coding关键词库（可粘贴到 keyword-library.json 的 keywordSets / signals 中）",
-  "updatedAt": "2026-03-22T14:36:43.033Z",
+  "updatedAt": "2026-03-22T14:41:26.351Z",
   "notes": [
     "规则1（机制保障）：chat 不参与 weighted match，只在无命中时作为 fallback 返回。实现已在 weighted-routing-engine 中强制过滤 chat + defaultFallbackKind。配置层建议继续保持 defaultFallbackKind=chat，并避免给 chat 配置会误命中的正向 signals。",
     "规则2（配置约束）：contains 匹配不要接入高歧义短缩写（尤其单字母/两字母）。它们可作为‘参考词表’保留，但不要挂到 positive signals；如需支持，建议未来用 regex + 单词边界。"
@@ -1079,6 +1079,175 @@
         }
       ],
       "note": "权重建议偏保守（1）。若你发现仍不足以区分 coding，可把部分强集合（如 python/js/java/rust/go）提升到 2。"
+    }
+  },
+  "part4_patch": {
+    "title": "第四部分：补充关键词补丁（在原库 + part2/part3 基础上仍建议增补的高信号词）",
+    "updatedAt": "2026-03-22T14:41:26.349Z",
+    "notes": [
+      "定位：这是一组‘补丁’——补充近两年常见的新工具/新生态词、以及更强的错误码/报错片段。",
+      "原则：仍然避免过泛词（例如：开发/实现/优化/配置/API/接口/函数等）。",
+      "策略：优先放到新的 set 里，再按需要挂到 coding.kind 的 positive signals（权重 1~2）。",
+      "注意：如果后续引入 regex match，可把 error-code 这一类做成更严格的规则（例如 TS\\d{4}）。"
+    ],
+    "keywordSets": {
+      "coding.scenario.js_runtime_modern": [
+        "bun",
+        "bunx",
+        "deno",
+        "npx",
+        "corepack",
+        "node --inspect",
+        "node:internal",
+        "ERR_MODULE_NOT_FOUND",
+        "ERR_REQUIRE_ESM",
+        "ExperimentalWarning"
+      ],
+      "coding.scenario.js_monorepo_tooling": [
+        "turborepo",
+        "turbo run",
+        "nx",
+        "lerna",
+        "changesets",
+        "pnpm workspace",
+        "workspaces"
+      ],
+      "coding.scenario.js_lint_format_modern": [
+        "biome",
+        "rome",
+        "eslint --fix",
+        "prettier --check",
+        "stylelint"
+      ],
+      "coding.scenario.python_tooling_modern": [
+        "uv",
+        "uv pip",
+        "uv run",
+        "pipx",
+        "ruff",
+        "tox",
+        "hatch",
+        "rye",
+        "pyenv",
+        "pip install -r",
+        "requirements-dev.txt"
+      ],
+      "coding.feature.error_codes": [
+        "TS2307",
+        "TS2339",
+        "TS2345",
+        "TS2322",
+        "TS2769",
+        "TS7006",
+        "CS0246",
+        "CS0103",
+        "CS1061",
+        "cannot find symbol",
+        "Exception in thread \"main\"",
+        "ModuleNotFoundError:",
+        "IndentationError:",
+        "mismatched types",
+        "borrowed value does not live long enough",
+        "undefined:",
+        "cannot use",
+        "SQLSTATE",
+        "ORA-",
+        "ERROR 1064"
+      ],
+      "coding.scenario.c_cpp_tooling_modern": [
+        "vcpkg",
+        "conan",
+        "clangd",
+        "clang-tidy",
+        "asan",
+        "ubsan",
+        "-fsanitize=address",
+        "-fsanitize=undefined"
+      ],
+      "coding.scenario.rust_ecosystem": [
+        "rust-analyzer",
+        "cargo fmt",
+        "cargo clippy",
+        "serde_json",
+        "anyhow",
+        "thiserror",
+        "tokio::"
+      ],
+      "coding.scenario.go_ecosystem": [
+        "go mod tidy",
+        "go vet",
+        "go generate",
+        "golangci-lint",
+        "protobuf",
+        "protoc"
+      ],
+      "coding.scenario.dotnet_ecosystem": [
+        "dotnet ef",
+        "EntityFrameworkCore",
+        "Microsoft.Extensions",
+        "appsettings.json"
+      ],
+      "coding.scenario.java_wrappers": [
+        "./mvnw",
+        "./gradlew",
+        "gradlew.bat",
+        "mvnw.cmd"
+      ]
+    },
+    "wiringExample": {
+      "kinds.coding.signals.positive_add_suggested": [
+        {
+          "set": "coding.feature.error_codes",
+          "weight": 2,
+          "match": "contains"
+        },
+        {
+          "set": "coding.scenario.python_tooling_modern",
+          "weight": 1,
+          "match": "contains"
+        },
+        {
+          "set": "coding.scenario.js_runtime_modern",
+          "weight": 1,
+          "match": "contains"
+        },
+        {
+          "set": "coding.scenario.js_monorepo_tooling",
+          "weight": 1,
+          "match": "contains"
+        },
+        {
+          "set": "coding.scenario.js_lint_format_modern",
+          "weight": 1,
+          "match": "contains"
+        },
+        {
+          "set": "coding.scenario.c_cpp_tooling_modern",
+          "weight": 1,
+          "match": "contains"
+        },
+        {
+          "set": "coding.scenario.rust_ecosystem",
+          "weight": 1,
+          "match": "contains"
+        },
+        {
+          "set": "coding.scenario.go_ecosystem",
+          "weight": 1,
+          "match": "contains"
+        },
+        {
+          "set": "coding.scenario.dotnet_ecosystem",
+          "weight": 1,
+          "match": "contains"
+        },
+        {
+          "set": "coding.scenario.java_wrappers",
+          "weight": 1,
+          "match": "contains"
+        }
+      ],
+      "note": "这批补丁如果全挂上仍觉得误命中增加，可先只接入 coding.feature.error_codes（权重2）+ python/js 的 modern tooling（权重1）。"
     }
   }
 }
