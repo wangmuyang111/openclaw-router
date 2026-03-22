@@ -23,3 +23,9 @@ Thumbs.db
 
 # Generated caches
 /tools/soft-router-suggest/model-catalog.cache.json
+
+# Generated plugin build artifacts (runtime source-of-truth is .ts)
+/plugin/*.js
+/plugin/*.js.map
+/plugin/*.d.ts
+/plugin/*.d.ts.map
