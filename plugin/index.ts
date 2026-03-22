@@ -25,7 +25,10 @@ import { promisify } from "node:util";
 import { loadAndCompileRoutingRules } from "./keyword-library.ts";
 import { routeByWeightedRules } from "./weighted-routing-engine.ts";
 import { resolveRouteSessionKey } from "../src/route-session-key.ts";
-import { resolveRuntimeRouteSessionKey } from "../src/routing-session-key.runtime.ts";
+import {
+  resolveRuntimeRouteSessionIdentity,
+  resolveRuntimeRouteSessionKey,
+} from "../src/routing-session-key.runtime.ts";
 import {
   RoutingSessionStore,
   type Confidence,
@@ -1456,14 +1459,17 @@ export default function register(api: OpenClawPluginApi) {
 
         const promptText = String(event.prompt ?? "");
         const ctxAny = ctx as any;
-        const sessionKey = resolveRuntimeRouteSessionKey({
+        const runtimeIdentity = resolveRuntimeRouteSessionIdentity({
           sessionKey: ctxAny?.sessionKey,
           sessionId: ctxAny?.sessionId,
+          threadId: ctxAny?.threadId,
+          thread_id: ctxAny?.thread_id,
           conversationId: ctxAny?.conversationId ?? ctx.conversationId,
           channelId: ctx.channelId,
           accountId: ctx.accountId,
           messageProvider: ctxAny?.messageProvider,
         });
+        const sessionKey = runtimeIdentity.key;
         const promptHash = crypto.createHash("sha1").update(promptText).digest("hex").slice(0, 16);
         const agentId = ctxAny?.agentId;
         const runtimeCfg = await getRuntimeRoutingConfig(api);
@@ -1488,6 +1494,7 @@ export default function register(api: OpenClawPluginApi) {
             attemptedMessageHash: promptHash,
             agentId,
             matchSource: match.source,
+            runtimeIdentitySource: runtimeIdentity.source,
           });
           return;
         }
@@ -1506,6 +1513,7 @@ export default function register(api: OpenClawPluginApi) {
             attemptedMessageHash: promptHash,
             agentId,
             matchSource: match.source,
+            runtimeIdentitySource: runtimeIdentity.source,
             messageHash: decision.messageHash,
           });
           return;

@@ -46,10 +46,10 @@
 `before_agent_start` 能拿到的上下文字段比 `message_received` 更弱，因此 session key 对齐目前采取“尽可能复用真实字段”的策略：
 
 - `ctx.sessionKey`
-- `ctx.threadId`
+- `ctx.sessionId`
+- `ctx.threadId` / `ctx.thread_id`
 - `ctx.conversationId`
-- `ctx.conversationId`
-- fallback `unknown`
+- fallback `runtime-fallback:${provider}:${accountId}`
 
 如果未来 OpenClaw hook 上下文字段增强，应优先继续强化这里的 session 对齐能力。
 

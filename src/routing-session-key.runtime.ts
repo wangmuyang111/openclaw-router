@@ -1,6 +1,8 @@
 export type RuntimeAgentContextLike = {
   sessionKey?: string | null;
   sessionId?: string | null;
+  threadId?: string | null;
+  thread_id?: string | null;
   conversationId?: string | null;
   channelId?: string | null;
   accountId?: string | null;
@@ -8,19 +10,48 @@ export type RuntimeAgentContextLike = {
   [key: string]: unknown;
 };
 
-export function resolveRuntimeRouteSessionKey(ctx: RuntimeAgentContextLike): string {
-  const candidates = [
-    ctx.sessionKey,
-    ctx.sessionId,
-    ctx.conversationId,
+export type RuntimeRouteSessionIdentitySource =
+  | "sessionKey"
+  | "sessionId"
+  | "threadId"
+  | "thread_id"
+  | "conversationId"
+  | "fallback";
+
+export type RuntimeRouteSessionIdentity = {
+  key: string;
+  source: RuntimeRouteSessionIdentitySource;
+};
+
+export function resolveRuntimeRouteSessionIdentity(
+  ctx: RuntimeAgentContextLike,
+): RuntimeRouteSessionIdentity {
+  const candidates: Array<{ source: RuntimeRouteSessionIdentitySource; value: unknown }> = [
+    { source: "sessionKey", value: ctx.sessionKey },
+    { source: "sessionId", value: ctx.sessionId },
+    { source: "threadId", value: ctx.threadId },
+    { source: "thread_id", value: ctx.thread_id },
+    { source: "conversationId", value: ctx.conversationId },
   ];
 
-  for (const value of candidates) {
-    const text = String(value ?? "").trim();
-    if (text) return text;
+  for (const candidate of candidates) {
+    const text = String(candidate.value ?? "").trim();
+    if (text) {
+      return {
+        key: text,
+        source: candidate.source,
+      };
+    }
   }
 
   const provider = String(ctx.messageProvider ?? ctx.channelId ?? "unknown").trim() || "unknown";
   const accountId = String(ctx.accountId ?? "unknown").trim() || "unknown";
-  return `runtime-fallback:${provider}:${accountId}`;
+  return {
+    key: `runtime-fallback:${provider}:${accountId}`,
+    source: "fallback",
+  };
+}
+
+export function resolveRuntimeRouteSessionKey(ctx: RuntimeAgentContextLike): string {
+  return resolveRuntimeRouteSessionIdentity(ctx).key;
 }
