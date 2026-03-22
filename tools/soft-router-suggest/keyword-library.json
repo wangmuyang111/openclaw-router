@@ -1,8 +1,8 @@
 {
   "$schema": "./keyword-library.schema.json",
   "version": 1,
-  "updatedAt": "2026-03-22T16:18:12.221Z",
-  "notes": "Simplified to 6 categories: strategy, coding, vision, support, general, chat. strategy merges planning + advanced_coding; support merges daily_support + emergency_fallback; quick_response keywords were fully preserved by merging into support/general/chat.\n[scheme B] move ambiguous short tokens (pip/CI/pipeline) out of contains sets; reintroduce via regex word-boundary/context patterns.\n[sync] merged coding keyword draft (coding关键词库.txt part1/2/3/4) keywordSets into keyword-library.json (sets only; not auto-wired).\n[cleanup] remove ambiguous tokens CI/pipeline from coding.feature.build_and_toolchain (handled by regex/safer phrases).\n[wiring] add coding.feature.package_files and coding.feature.build_and_toolchain to kinds.coding positive (weight=2).\n[fix] normalize regex pattern escape level (\\\\ -> \\) so RegExp() receives real regex escapes.\n[tune] set coding.minStrongHits=0 to improve recall for file/tooling signals.\n[tune] restore coding.minStrongHits=1 (use *.strong set ids to satisfy strongHit without raising weight).\n[tune] mark package_files/build_and_toolchain as strong by using *.strong set ids (counts as strongHit).\n[conservative] add small safe strong coding set for framework/tooling-specific terms (weight=2).\n[strategy scheme B] move race/architecture to regex word-boundary to avoid substring matches (trace/conceptual steals).\n[conservative] add context.Context/trace id (Go tracing) to safe coding strong set.\n[sql] wire coding.lang.sql.strong (weight=2) so natural-language prompts that mention 'SQL' (without SELECT/FROM) still hit coding under minStrongHits=1.\n[cleanup] dedup coding.lang.sql.strong terms to avoid double scoring (SQL vs SQL：).\n[sql] simplify coding.lang.sql.strong: keep only core tokens to avoid duplicate matches (SQL:, SQL：).",
+  "updatedAt": "2026-03-22T17:01:51.480Z",
+  "notes": "Simplified to 6 categories: strategy, coding, vision, support, general, chat. strategy merges planning + advanced_coding; support merges daily_support + emergency_fallback; quick_response keywords were fully preserved by merging into support/general/chat.\n[scheme B] move ambiguous short tokens (pip/CI/pipeline) out of contains sets; reintroduce via regex word-boundary/context patterns.\n[sync] merged coding keyword draft (coding关键词库.txt part1/2/3/4) keywordSets into keyword-library.json (sets only; not auto-wired).\n[cleanup] remove ambiguous tokens CI/pipeline from coding.feature.build_and_toolchain (handled by regex/safer phrases).\n[wiring] add coding.feature.package_files and coding.feature.build_and_toolchain to kinds.coding positive (weight=2).\n[fix] normalize regex pattern escape level (\\\\ -> \\) so RegExp() receives real regex escapes.\n[tune] set coding.minStrongHits=0 to improve recall for file/tooling signals.\n[tune] restore coding.minStrongHits=1 (use *.strong set ids to satisfy strongHit without raising weight).\n[tune] mark package_files/build_and_toolchain as strong by using *.strong set ids (counts as strongHit).\n[conservative] add small safe strong coding set for framework/tooling-specific terms (weight=2).\n[strategy scheme B] move race/architecture to regex word-boundary to avoid substring matches (trace/conceptual steals).\n[conservative] add context.Context/trace id (Go tracing) to safe coding strong set.\n[sql] wire coding.lang.sql.strong (weight=2) so natural-language prompts that mention 'SQL' (without SELECT/FROM) still hit coding under minStrongHits=1.\n[cleanup] dedup coding.lang.sql.strong terms to avoid double scoring (SQL vs SQL：).\n[sql] simplify coding.lang.sql.strong: keep only core tokens to avoid duplicate matches (SQL:, SQL：).\n[auto-hardening] trial enable: coding.feature.build_and_toolchain.strong, coding.feature.c_cpp.strong\n[auto-hardening] trial enable: coding.feature.csharp_dotnet.strong, coding.feature.error_codes.strong\n[auto-hardening] trial enable: coding.feature.java_jvm.strong, coding.feature.js_ts_node.strong\n[auto-hardening] trial enable: coding.feature.kotlin.strong, coding.feature.package_files.strong\n[auto-hardening] trial enable: coding.feature.php.strong, coding.feature.powershell.strong\n[auto-hardening] trial enable: coding.feature.python.strong, coding.feature.risky_or_generic_reference_only.strong\n[auto-hardening] trial enable: coding.feature.shell.strong, coding.feature.solidity.strong\n[auto-hardening] trial enable: coding.feature.sql.strong, coding.feature.swift_objc.strong\n[auto-hardening] trial enable: coding.lang.abbrev.safe.strong, coding.lang.dsl_and_data.strong\n[auto-hardening] trial enable: coding.scenario.c_cpp.strong, coding.scenario.c_cpp_tooling_modern.strong\n[auto-hardening] trial enable: coding.scenario.common.db.strong, coding.scenario.common.devops.strong\n[auto-hardening] trial enable: coding.scenario.csharp_dotnet.strong, coding.scenario.dart_flutter.strong\n[auto-hardening] trial enable: coding.scenario.dotnet_ecosystem.strong, coding.scenario.erlang_elixir.strong\n[auto-hardening] trial enable: coding.scenario.go.strong, coding.scenario.go_ecosystem.strong\n[auto-hardening] trial enable: coding.scenario.haskell.strong, coding.scenario.hdl.strong\n[auto-hardening] trial enable: coding.scenario.java_jvm.strong, coding.scenario.java_wrappers.strong\n[auto-hardening] trial enable: coding.scenario.js_lint_format_modern.strong, coding.scenario.js_monorepo_tooling.strong\n[auto-hardening] trial enable: coding.scenario.kotlin_android.strong, coding.scenario.matlab_r.strong\n[auto-hardening] trial enable: coding.scenario.php.strong, coding.scenario.powershell.strong\n[auto-hardening] trial enable: coding.scenario.python.strong, coding.scenario.python_tooling_modern.strong\n[auto-hardening] trial enable: coding.scenario.rust_ecosystem.strong, coding.scenario.scala.strong\n[auto-hardening] trial enable: coding.scenario.shell.strong, coding.scenario.solidity.strong\n[auto-hardening] trial enable: coding.scenario.sql.strong, coding.scenario.swift_ios.strong\n[auto-hardening] trial enable: coding.feature.kotlin.strong, coding.feature.package_files.strong\n[auto-hardening] trial enable: coding.feature.php.strong, coding.feature.powershell.strong\n[auto-hardening] trial enable: coding.feature.python.strong, coding.feature.risky_or_generic_reference_only.strong\n[auto-hardening] trial enable: coding.feature.ruby.strong, coding.feature.rust.strong",
   "defaultFallbackKind": "chat",
   "normalization": {
     "lowercase": true,
@@ -2163,6 +2163,595 @@
       "Postgres",
       "MySQL",
       "SQLite"
+    ],
+    "coding.feature.c_cpp.strong": [
+      "#include",
+      "#include <",
+      "std::",
+      "cout <<",
+      "cin >>",
+      "nullptr",
+      "template<",
+      "constexpr",
+      "malloc(",
+      "free(",
+      "sizeof(",
+      "g++",
+      "gcc",
+      "clang",
+      "cmake",
+      "make"
+    ],
+    "coding.feature.csharp_dotnet.strong": [
+      "dotnet build",
+      "dotnet test",
+      "dotnet restore",
+      "NuGet",
+      "using System",
+      "Console.WriteLine",
+      "System.Linq",
+      "async Task",
+      "IEnumerable"
+    ],
+    "coding.feature.error_codes.strong": [
+      "TS2307",
+      "TS2339",
+      "TS2345",
+      "TS2322",
+      "TS2769",
+      "TS7006",
+      "CS0246",
+      "CS0103",
+      "CS1061",
+      "cannot find symbol",
+      "Exception in thread \"main\"",
+      "ModuleNotFoundError:",
+      "IndentationError:",
+      "mismatched types",
+      "borrowed value does not live long enough",
+      "undefined:",
+      "cannot use",
+      "SQLSTATE",
+      "ORA-",
+      "ERROR 1064"
+    ],
+    "coding.feature.java_jvm.strong": [
+      "public static void main",
+      "System.out.println",
+      "NullPointerException",
+      "ClassNotFoundException",
+      "NoSuchMethodError",
+      "mvn clean",
+      "mvn test",
+      "gradle build",
+      "./gradlew",
+      "JDK",
+      "JRE",
+      "javac",
+      "Spring Boot",
+      "Hibernate"
+    ],
+    "coding.feature.js_ts_node.strong": [
+      "node_modules",
+      "npm install",
+      "npm run",
+      "pnpm add",
+      "yarn add",
+      "tsc ",
+      "eslint",
+      "prettier",
+      "webpack",
+      "rollup",
+      "vite",
+      "Next.js",
+      "Nuxt",
+      "import {",
+      "export default",
+      "module.exports",
+      "require(",
+      "console.log(",
+      "Promise",
+      "async function",
+      "TypeError: Cannot read properties of undefined",
+      "ReferenceError:",
+      "SyntaxError:"
+    ],
+    "coding.feature.kotlin.strong": [
+      "data class",
+      "suspend fun",
+      "CoroutineScope",
+      "Android Studio"
+    ],
+    "coding.feature.php.strong": [
+      "composer install",
+      "composer update",
+      "php artisan",
+      "Fatal error: Uncaught",
+      "Parse error:",
+      "$_GET",
+      "$_POST",
+      "Laravel",
+      "Symfony"
+    ],
+    "coding.feature.powershell.strong": [
+      "Get-ChildItem",
+      "Select-Object",
+      "Format-Table",
+      "Write-Host",
+      "$env:",
+      "Invoke-WebRequest",
+      "Invoke-RestMethod"
+    ],
+    "coding.feature.python.strong": [
+      "def ",
+      "def\n",
+      "async def",
+      "await ",
+      "__init__",
+      "__main__",
+      "if __name__ == '__main__'",
+      "python -m",
+      "pip install",
+      "pip3 install",
+      "venv",
+      "virtualenv",
+      "site-packages",
+      "pytest",
+      "unittest",
+      "pylint",
+      "flake8",
+      "black",
+      "IndentationError",
+      "ModuleNotFoundError",
+      "ImportError",
+      "KeyError",
+      "ValueError",
+      "TypeError",
+      "AttributeError",
+      "numpy",
+      "pandas",
+      "asyncio"
+    ],
+    "coding.feature.risky_or_generic_reference_only.strong": [
+      "class ",
+      "if (",
+      "for (",
+      "while (",
+      "var ",
+      "let ",
+      "const ",
+      "int ",
+      "string ",
+      "return ",
+      "function ",
+      "end"
+    ],
+    "coding.feature.shell.strong": [
+      "#!/bin/bash",
+      "chmod +x",
+      "set -e",
+      "set -euo pipefail",
+      "sudo ",
+      "curl ",
+      "wget ",
+      "grep -",
+      "awk ",
+      "sed ",
+      "systemctl ",
+      "export PATH="
+    ],
+    "coding.feature.solidity.strong": [
+      "pragma solidity",
+      "contract ",
+      "msg.sender",
+      "uint256",
+      "require(",
+      "emit ",
+      "mapping("
+    ],
+    "coding.feature.sql.strong": [
+      "SELECT ",
+      "FROM ",
+      "WHERE ",
+      "JOIN ",
+      "GROUP BY",
+      "ORDER BY",
+      "INSERT INTO",
+      "DELETE FROM",
+      "EXPLAIN",
+      "psql",
+      "mysql",
+      "sqlite"
+    ],
+    "coding.feature.swift_objc.strong": [
+      "SwiftUI",
+      "@State",
+      "@Published",
+      "guard let",
+      "Xcode",
+      "CocoaPods",
+      "Podfile",
+      "pod install",
+      "Swift Package Manager",
+      "SPM",
+      "@interface",
+      "@implementation"
+    ],
+    "coding.lang.abbrev.safe.strong": [
+      "JS",
+      "TS",
+      "Node.js",
+      "Nodejs",
+      "JVM",
+      ".NET",
+      "dotnet",
+      "CLR"
+    ],
+    "coding.lang.dsl_and_data.strong": [
+      "HTML",
+      "CSS",
+      "XML",
+      "JSON",
+      "YAML",
+      "YML",
+      "Markdown",
+      "MD",
+      "Regex",
+      "RegExp",
+      "Regular Expression",
+      "GraphQL",
+      "Makefile",
+      "CMake",
+      "Terraform",
+      "HCL",
+      "Nix",
+      "Starlark"
+    ],
+    "coding.scenario.c_cpp.strong": [
+      "#include",
+      "CMakeLists.txt",
+      "g++",
+      "gcc",
+      "clang",
+      "gdb",
+      "valgrind",
+      "ASan",
+      "UBSan",
+      "-fsanitize",
+      "segmentation fault",
+      "core dumped",
+      "undefined reference to",
+      "std::vector",
+      "std::string",
+      "unique_ptr",
+      "shared_ptr"
+    ],
+    "coding.scenario.c_cpp_tooling_modern.strong": [
+      "vcpkg",
+      "conan",
+      "clangd",
+      "clang-tidy",
+      "asan",
+      "ubsan",
+      "-fsanitize=address",
+      "-fsanitize=undefined"
+    ],
+    "coding.scenario.common.db.strong": [
+      "PostgreSQL",
+      "Postgres",
+      "MySQL",
+      "SQLite",
+      "Redis",
+      "MongoDB",
+      "Elasticsearch",
+      "EXPLAIN",
+      "index",
+      "transaction",
+      "deadlock"
+    ],
+    "coding.scenario.common.devops.strong": [
+      "Docker",
+      "docker-compose",
+      "Kubernetes",
+      "k8s",
+      "Helm",
+      "Terraform",
+      "Ansible",
+      "systemd",
+      "systemctl",
+      "Linux"
+    ],
+    "coding.scenario.csharp_dotnet.strong": [
+      "ASP.NET",
+      "ASP.NET Core",
+      "Entity Framework",
+      "EF Core",
+      "LINQ",
+      "NuGet",
+      "dotnet restore",
+      "dotnet build",
+      "dotnet publish",
+      "csproj",
+      "sln",
+      "MSBuild",
+      "IEnumerable",
+      "Task<"
+    ],
+    "coding.scenario.dart_flutter.strong": [
+      "Flutter",
+      "pubspec.yaml",
+      "dart pub",
+      "flutter pub",
+      "Widget",
+      "StatefulWidget",
+      "BuildContext"
+    ],
+    "coding.scenario.dotnet_ecosystem.strong": [
+      "dotnet ef",
+      "EntityFrameworkCore",
+      "Microsoft.Extensions",
+      "appsettings.json"
+    ],
+    "coding.scenario.erlang_elixir.strong": [
+      "rebar3",
+      "erl",
+      "io:format",
+      "OTP",
+      "defmodule",
+      "mix.exs",
+      "mix test",
+      "iex"
+    ],
+    "coding.scenario.go.strong": [
+      "gofmt",
+      "golangci-lint",
+      "go mod",
+      "go get",
+      "go install",
+      "context.Context",
+      "net/http",
+      "Gin",
+      "Echo",
+      "GORM",
+      "grpc-go",
+      "err != nil",
+      "panic:"
+    ],
+    "coding.scenario.go_ecosystem.strong": [
+      "go mod tidy",
+      "go vet",
+      "go generate",
+      "golangci-lint",
+      "protobuf",
+      "protoc"
+    ],
+    "coding.scenario.haskell.strong": [
+      "ghci",
+      "cabal",
+      "stack.yaml",
+      "{-# LANGUAGE",
+      "Monad",
+      "Functor",
+      "Applicative"
+    ],
+    "coding.scenario.hdl.strong": [
+      "Verilog",
+      "SystemVerilog",
+      "VHDL",
+      "endmodule",
+      "always @(",
+      "posedge",
+      "negedge"
+    ],
+    "coding.scenario.java_jvm.strong": [
+      "Spring",
+      "Spring Boot",
+      "Maven",
+      "Gradle",
+      "pom.xml",
+      "build.gradle",
+      "Lombok",
+      "SLF4J",
+      "Logback",
+      "Log4j",
+      "Tomcat",
+      "Jetty",
+      "JPA",
+      "Hibernate",
+      "@RestController",
+      "@Autowired",
+      "Exception in thread",
+      "Caused by:"
+    ],
+    "coding.scenario.java_wrappers.strong": [
+      "./mvnw",
+      "./gradlew",
+      "gradlew.bat",
+      "mvnw.cmd"
+    ],
+    "coding.scenario.js_lint_format_modern.strong": [
+      "biome",
+      "rome",
+      "eslint --fix",
+      "prettier --check",
+      "stylelint"
+    ],
+    "coding.scenario.js_monorepo_tooling.strong": [
+      "turborepo",
+      "turbo run",
+      "nx",
+      "lerna",
+      "changesets",
+      "pnpm workspace",
+      "workspaces"
+    ],
+    "coding.scenario.kotlin_android.strong": [
+      "Android",
+      "Android Studio",
+      "Gradle",
+      "Kotlin DSL",
+      "Coroutine",
+      "suspend fun",
+      "Jetpack",
+      "Compose",
+      "Ktor"
+    ],
+    "coding.scenario.matlab_r.strong": [
+      "MATLAB",
+      "Simulink",
+      "RStudio",
+      "tidyverse",
+      "ggplot2",
+      "data.frame"
+    ],
+    "coding.scenario.php.strong": [
+      "Laravel",
+      "Symfony",
+      "composer",
+      "composer install",
+      "artisan",
+      "Eloquent",
+      "Blade",
+      "Fatal error: Uncaught",
+      "Parse error:",
+      "undefined function"
+    ],
+    "coding.scenario.powershell.strong": [
+      "Get-ChildItem",
+      "Select-Object",
+      "Format-Table",
+      "Write-Host",
+      "$env:",
+      "ExecutionPolicy",
+      "Invoke-WebRequest",
+      "Invoke-RestMethod"
+    ],
+    "coding.scenario.python.strong": [
+      "FastAPI",
+      "Django",
+      "Flask",
+      "uvicorn",
+      "gunicorn",
+      "Celery",
+      "pydantic",
+      "mypy",
+      "typing",
+      "dataclass",
+      "__init__.py",
+      "site-packages",
+      "pip install",
+      "python -m",
+      "virtualenv",
+      "venv",
+      "Conda",
+      "Anaconda",
+      "ipynb",
+      "beautifulsoup",
+      "requests",
+      "asyncio"
+    ],
+    "coding.scenario.python_tooling_modern.strong": [
+      "uv",
+      "uv pip",
+      "uv run",
+      "pipx",
+      "ruff",
+      "tox",
+      "hatch",
+      "rye",
+      "pyenv",
+      "pip install -r",
+      "requirements-dev.txt"
+    ],
+    "coding.scenario.rust_ecosystem.strong": [
+      "rust-analyzer",
+      "cargo fmt",
+      "cargo clippy",
+      "serde_json",
+      "anyhow",
+      "thiserror",
+      "tokio::"
+    ],
+    "coding.scenario.scala.strong": [
+      "sbt",
+      "Scala",
+      "Akka",
+      "Spark",
+      "case class",
+      "implicit"
+    ],
+    "coding.scenario.shell.strong": [
+      "#!/bin/bash",
+      "chmod +x",
+      "set -e",
+      "pipefail",
+      "ssh ",
+      "scp ",
+      "curl ",
+      "grep ",
+      "awk ",
+      "sed "
+    ],
+    "coding.scenario.solidity.strong": [
+      "pragma solidity",
+      "contract ",
+      "msg.sender",
+      "uint256",
+      "require(",
+      "emit ",
+      "mapping(",
+      "Hardhat",
+      "Foundry"
+    ],
+    "coding.scenario.sql.strong": [
+      "SELECT",
+      "JOIN",
+      "GROUP BY",
+      "ORDER BY",
+      "EXPLAIN ANALYZE",
+      "index scan",
+      "query plan",
+      "transaction",
+      "isolation level",
+      "deadlock"
+    ],
+    "coding.scenario.swift_ios.strong": [
+      "SwiftUI",
+      "UIKit",
+      "Xcode",
+      "xcodebuild",
+      "CocoaPods",
+      "Podfile",
+      "pod install",
+      "Swift Package Manager",
+      "SPM",
+      "@State"
+    ],
+    "coding.feature.ruby.strong": [
+      "bundle install",
+      "bundle exec",
+      "rails ",
+      "rake ",
+      "NoMethodError",
+      "NameError",
+      "irb",
+      "puts "
+    ],
+    "coding.feature.rust.strong": [
+      "cargo build",
+      "cargo test",
+      "cargo run",
+      "rustc",
+      "borrow checker",
+      "lifetime",
+      "impl ",
+      "trait ",
+      "crate",
+      "Option<",
+      "Result<",
+      "unwrap()",
+      "println!(",
+      "error[E"
     ]
   },
   "kinds": {
@@ -2253,6 +2842,236 @@
           },
           {
             "set": "coding.lang.sql.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.c_cpp.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.csharp_dotnet.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.error_codes.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.java_jvm.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.js_ts_node.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.kotlin.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.php.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.powershell.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.python.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.risky_or_generic_reference_only.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.shell.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.solidity.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.sql.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.swift_objc.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.lang.abbrev.safe.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.lang.dsl_and_data.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.c_cpp.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.c_cpp_tooling_modern.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.common.db.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.common.devops.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.csharp_dotnet.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.dart_flutter.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.dotnet_ecosystem.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.erlang_elixir.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.go.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.go_ecosystem.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.haskell.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.hdl.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.java_jvm.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.java_wrappers.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.js_lint_format_modern.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.js_monorepo_tooling.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.kotlin_android.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.matlab_r.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.php.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.powershell.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.python.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.python_tooling_modern.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.rust_ecosystem.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.scala.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.shell.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.solidity.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.sql.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.swift_ios.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.ruby.strong",
+            "weight": 2,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.rust.strong",
             "weight": 2,
             "match": "contains"
           }
