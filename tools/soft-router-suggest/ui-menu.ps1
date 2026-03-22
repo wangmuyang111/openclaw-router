@@ -872,18 +872,28 @@ function Run-Keywords {
 }
 
 function Run-Preview {
-  Write-Host (("=== {0} ===" -f (T 'preview.title'))) -ForegroundColor Cyan
-  $text = Read-InputOrEsc (T 'preview.paste')
-  if ($null -eq $text) { return }
-  if ([string]::IsNullOrWhiteSpace($text)) { return }
-  $hasImage = Read-ChoiceOrEsc (T 'preview.hasImage')
-  if ($null -eq $hasImage) { return }
-  if ($hasImage -match '^(y|Y)') {
-    & $previewScript -Text $text -HasImage | Out-Host
-  } else {
-    & $previewScript -Text $text | Out-Host
+  while ($true) {
+    Safe-Clear
+    Write-Host (("=== {0} ===" -f (T 'preview.title'))) -ForegroundColor Cyan
+    Write-Host (T 'preview.continuousHint') -ForegroundColor DarkGray
+
+    $text = Read-InputOrEsc (T 'preview.paste')
+    if ($null -eq $text) { return }
+    if ([string]::IsNullOrWhiteSpace($text)) { continue }
+
+    $hasImage = Read-ChoiceOrEsc (T 'preview.hasImage')
+    if ($null -eq $hasImage) { return }
+
+    if ($hasImage -match '^(y|Y)') {
+      & $previewScript -Text $text -HasImage | Out-Host
+    } else {
+      & $previewScript -Text $text | Out-Host
+    }
+
+    # Enter continues to next test; ESC goes back.
+    $next = Read-LineOrEsc -prompt ((T 'preview.next') + ': ') -AllowEmpty
+    if ($null -eq $next) { return }
   }
-  Wait-AnyKeyOrEsc
 }
 
 function Select-OnOff([string]$title, [bool]$currentValue) {
