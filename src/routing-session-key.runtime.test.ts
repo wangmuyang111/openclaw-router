@@ -56,11 +56,11 @@ test("resolveRuntimeRouteSessionIdentity reports which runtime field won", () =>
 
   assert.deepEqual(
     resolveRuntimeRouteSessionIdentity({
-      conversationId: "conv-6",
+      chatId: "chat-42",
     }),
     {
-      key: "conv-6",
-      source: "conversationId",
+      key: "chat-42",
+      source: "chatId",
     },
   );
 });

@@ -49,6 +49,7 @@
 - `ctx.sessionId`
 - `ctx.threadId` / `ctx.thread_id`
 - `ctx.conversationId`
+- `ctx.chatId` / `ctx.chat_id`
 - fallback `runtime-fallback:${provider}:${accountId}`
 
 如果未来 OpenClaw hook 上下文字段增强，应优先继续强化这里的 session 对齐能力。

@@ -24,7 +24,10 @@ import { promisify } from "node:util";
 // NEW: keyword library + weighted routing (for user-custom keyword add/remove)
 import { loadAndCompileRoutingRules } from "./keyword-library.ts";
 import { routeByWeightedRules } from "./weighted-routing-engine.ts";
-import { resolveRouteSessionKey } from "../src/route-session-key.ts";
+import {
+  resolveRouteSessionIdentity,
+  resolveRouteSessionKey,
+} from "../src/route-session-key.ts";
 import {
   resolveRuntimeRouteSessionIdentity,
   resolveRuntimeRouteSessionKey,
@@ -1255,6 +1258,13 @@ function resolveRouteSessionKeyFromMessageContext(
   return resolveRouteSessionKey(ctx as any, event as any);
 }
 
+function resolveRouteSessionIdentityFromMessageContext(
+  ctx: PluginHookMessageContext,
+  event: PluginHookMessageReceivedEvent,
+) {
+  return resolveRouteSessionIdentity(ctx as any, event as any);
+}
+
 function canonicalModelForms(model: string): string[] {
   const raw = String(model ?? "").trim();
   if (!raw) return [];
@@ -1465,6 +1475,8 @@ export default function register(api: OpenClawPluginApi) {
           threadId: ctxAny?.threadId,
           thread_id: ctxAny?.thread_id,
           conversationId: ctxAny?.conversationId ?? ctx.conversationId,
+          chatId: ctxAny?.chatId,
+          chat_id: ctxAny?.chat_id,
           channelId: ctx.channelId,
           accountId: ctx.accountId,
           messageProvider: ctxAny?.messageProvider,
@@ -1890,7 +1902,8 @@ export default function register(api: OpenClawPluginApi) {
           lastSuggestionByConversation.set(ctx.conversationId, suggestion);
         }
 
-        const routeSessionKey = resolveRouteSessionKeyFromMessageContext(ctx, event);
+        const messageIdentity = resolveRouteSessionIdentityFromMessageContext(ctx, event);
+        const routeSessionKey = messageIdentity.key;
         const runtimeCfg = await getRuntimeRoutingConfig(api);
         const messageMetadata = (event.metadata ?? {}) as Record<string, unknown>;
         const rawMessageId = messageMetadata.messageId ?? messageMetadata.message_id ?? messageMetadata.id;
@@ -1935,6 +1948,7 @@ export default function register(api: OpenClawPluginApi) {
             confidence: suggestion.confidence,
             candidateModel: suggestion.model,
             expiresInMs: ROUTE_DECISION_TTL_MS,
+            messageIdentitySource: messageIdentity.source,
             taskModeEnabled: runtimeCfg.taskModeEnabled,
             taskModePrimaryKind: runtimeCfg.taskModePrimaryKind,
             taskModeKinds: runtimeCfg.taskModeKinds,

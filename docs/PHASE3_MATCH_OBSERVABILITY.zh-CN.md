@@ -26,8 +26,16 @@ findRouteDecisionMatch({ sessionKey, conversationId, messageHash })
 - `matchSource`
 - `matchedSessionKey`
 - `runtimeSessionKey`
+- `runtimeIdentitySource`
 - `attemptedConversationId`
 - `attemptedMessageHash`
+
+在 `message_received` 缓存 decision 时，日志也会显式记录：
+
+- `messageIdentitySource`
+- `sessionKey`
+- `conversationId`
+- `messageHash`
 
 ### 关键事件
 

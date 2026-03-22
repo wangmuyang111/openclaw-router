@@ -4,6 +4,8 @@ export type RuntimeAgentContextLike = {
   threadId?: string | null;
   thread_id?: string | null;
   conversationId?: string | null;
+  chatId?: string | null;
+  chat_id?: string | null;
   channelId?: string | null;
   accountId?: string | null;
   messageProvider?: string | null;
@@ -16,6 +18,8 @@ export type RuntimeRouteSessionIdentitySource =
   | "threadId"
   | "thread_id"
   | "conversationId"
+  | "chatId"
+  | "chat_id"
   | "fallback";
 
 export type RuntimeRouteSessionIdentity = {
@@ -32,6 +36,8 @@ export function resolveRuntimeRouteSessionIdentity(
     { source: "threadId", value: ctx.threadId },
     { source: "thread_id", value: ctx.thread_id },
     { source: "conversationId", value: ctx.conversationId },
+    { source: "chatId", value: ctx.chatId },
+    { source: "chat_id", value: ctx.chat_id },
   ];
 
   for (const candidate of candidates) {
