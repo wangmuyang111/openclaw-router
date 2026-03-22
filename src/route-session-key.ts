@@ -63,8 +63,15 @@ export function resolveRouteSessionIdentity(
 
   const provider = String(metadata.provider ?? ctx.channelId ?? "unknown").trim() || "unknown";
   const accountId =
-    String(ctx.accountId ?? metadata.accountId ?? metadata.account_id ?? "unknown").trim() ||
-    "unknown";
+    String(
+      ctx.accountId ??
+        metadata.accountId ??
+        metadata.account_id ??
+        // webchat: senderId is the most stable per-user identifier we can rely on.
+        metadata.senderId ??
+        metadata.sender_id ??
+        "unknown",
+    ).trim() || "unknown";
   const from = String(event.from ?? metadata.from ?? "unknown").trim() || "unknown";
   return {
     key: `fallback:${provider}:${accountId}:${from}`,

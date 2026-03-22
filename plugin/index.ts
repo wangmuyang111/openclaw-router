@@ -39,6 +39,10 @@ import {
   type TaskSessionState,
 } from "../src/routing-session-store.ts";
 import { getRouteTrustDecision } from "../src/routing-trust-policy.ts";
+import {
+  computeRuntimeMessageHash,
+  computeShortHash,
+} from "../src/runtime-message-hash.ts";
 
 type PluginConfig = {
   enabled?: boolean;
@@ -1266,6 +1270,26 @@ function resolveRouteSessionIdentityFromMessageContext(
   return resolveRouteSessionIdentity(ctx as any, event as any);
 }
 
+function getRuntimeRouteSessionAliasesForMessageContext(
+  ctx: PluginHookMessageContext,
+  event: PluginHookMessageReceivedEvent,
+  routeSessionKey: string,
+): string[] {
+  const aliases = new Set<string>();
+  const metadata = (event.metadata ?? {}) as Record<string, unknown>;
+  const provider = String(metadata.provider ?? ctx.channelId ?? "").trim();
+  const surface = String(metadata.surface ?? "").trim();
+
+  // webchat direct + main agent: runtime side sessionKey is typically "agent:main:main".
+  // Keep this bridge very narrow: only when message-side identity already degraded to fallback:webchat:*.
+  // We intentionally do NOT require surface to match; some webchat events omit it or use other labels.
+  if (routeSessionKey.startsWith("fallback:webchat:") && provider === "webchat") {
+    aliases.add("agent:main:main");
+  }
+
+  return Array.from(aliases);
+}
+
 function canonicalModelForms(model: string): string[] {
   const raw = String(model ?? "").trim();
   if (!raw) return [];
@@ -1483,7 +1507,11 @@ export default function register(api: OpenClawPluginApi) {
           messageProvider: ctxAny?.messageProvider,
         });
         const sessionKey = runtimeIdentity.key;
-        const promptHash = crypto.createHash("sha1").update(promptText).digest("hex").slice(0, 16);
+        const runtimeMessageHash = computeRuntimeMessageHash({
+          prompt: promptText,
+          messages: event.messages,
+        });
+        const promptHash = runtimeMessageHash.hash;
         const agentId = ctxAny?.agentId;
         const runtimeCfg = await getRuntimeRoutingConfig(api);
 
@@ -1510,6 +1538,7 @@ export default function register(api: OpenClawPluginApi) {
             sessionKey,
             attemptedConversationId,
             attemptedMessageHash: promptHash,
+            attemptedMessageHashSource: runtimeMessageHash.source,
             agentId,
             matchSource: match.source,
             runtimeIdentitySource: runtimeIdentity.source,
@@ -1531,6 +1560,7 @@ export default function register(api: OpenClawPluginApi) {
             matchedSessionKey: match.matchedSessionKey,
             attemptedConversationId,
             attemptedMessageHash: promptHash,
+            attemptedMessageHashSource: runtimeMessageHash.source,
             agentId,
             matchSource: match.source,
             runtimeIdentitySource: runtimeIdentity.source,
@@ -1552,6 +1582,7 @@ export default function register(api: OpenClawPluginApi) {
             matchedSessionKey: match.matchedSessionKey,
             attemptedConversationId,
             attemptedMessageHash: promptHash,
+            attemptedMessageHashSource: runtimeMessageHash.source,
             agentId,
             matchSource: match.source,
             runtimeIdentitySource: runtimeIdentity.source,
@@ -1578,6 +1609,7 @@ export default function register(api: OpenClawPluginApi) {
           matchedSessionKey: match.matchedSessionKey,
           attemptedConversationId,
           attemptedMessageHash: promptHash,
+          attemptedMessageHashSource: runtimeMessageHash.source,
           agentId,
           matchSource: match.source,
           runtimeIdentitySource: runtimeIdentity.source,
@@ -1858,6 +1890,72 @@ export default function register(api: OpenClawPluginApi) {
 
         const suggestion = await classifyDynamic(api, event.content, event.metadata);
         const cfg = resolveConfig(api);
+        const messageIdentity = resolveRouteSessionIdentityFromMessageContext(ctx, event);
+        const routeSessionKey = messageIdentity.key;
+        const runtimeCfg = await getRuntimeRoutingConfig(api);
+        const messageMetadata = (event.metadata ?? {}) as Record<string, unknown>;
+        const rawMessageId = messageMetadata.messageId ?? messageMetadata.message_id ?? messageMetadata.id;
+        const messageId = typeof rawMessageId === "string" ? rawMessageId : undefined;
+        const messageHash = computeShortHash(String(event.content ?? "").trim());
+        const runtimeSessionAliases = routeSessionKey
+          ? getRuntimeRouteSessionAliasesForMessageContext(ctx, event, routeSessionKey)
+          : [];
+
+        if (routeSessionKey) {
+          const now = Date.now();
+          const baseDecision = {
+            conversationId: ctx.conversationId,
+            channelId: ctx.channelId,
+            messageId,
+            messageHash,
+            contentPreview: preview(event.content, 120),
+            kind: suggestion.kind,
+            confidence: suggestion.confidence,
+            candidateModel: suggestion.model,
+            reason: suggestion.reason,
+            signals: Array.isArray(suggestion.signals) ? suggestion.signals : [],
+            createdAtMs: now,
+            expiresAtMs: now + ROUTE_DECISION_TTL_MS,
+            source: "message_received" as const,
+          };
+
+          routingSessionStore.setRouteDecision(routeSessionKey, {
+            sessionKey: routeSessionKey,
+            ...baseDecision,
+          });
+
+          for (const alias of runtimeSessionAliases) {
+            routingSessionStore.setRouteDecision(alias, {
+              sessionKey: alias,
+              ...baseDecision,
+            });
+          }
+
+          await appendJsonl(api, {
+            ts: nowIso(),
+            type: "soft_router_suggest",
+            event: "route_decision_cached",
+            dryRun: true,
+            sessionKey: routeSessionKey,
+            runtimeSessionAliases,
+            channelId: ctx.channelId,
+            accountId: ctx.accountId,
+            conversationId: ctx.conversationId,
+            messageId,
+            messageHash,
+            kind: suggestion.kind,
+            confidence: suggestion.confidence,
+            candidateModel: suggestion.model,
+            expiresInMs: ROUTE_DECISION_TTL_MS,
+            messageIdentitySource: messageIdentity.source,
+            taskModeEnabled: runtimeCfg.taskModeEnabled,
+            taskModePrimaryKind: runtimeCfg.taskModePrimaryKind,
+            taskModeKinds: runtimeCfg.taskModeKinds,
+            taskModeDisabledKinds: runtimeCfg.taskModeDisabledKinds,
+            taskModeMinConfidence: runtimeCfg.taskModeMinConfidence,
+            stage: "pre_enrichment",
+          });
+        }
 
         // Optional: rule engine overrides suggestion.model by scoring catalog + tags + rules.
         if (cfg.ruleEngineEnabled) {
@@ -1939,22 +2037,9 @@ export default function register(api: OpenClawPluginApi) {
           lastSuggestionByConversation.set(ctx.conversationId, suggestion);
         }
 
-        const messageIdentity = resolveRouteSessionIdentityFromMessageContext(ctx, event);
-        const routeSessionKey = messageIdentity.key;
-        const runtimeCfg = await getRuntimeRoutingConfig(api);
-        const messageMetadata = (event.metadata ?? {}) as Record<string, unknown>;
-        const rawMessageId = messageMetadata.messageId ?? messageMetadata.message_id ?? messageMetadata.id;
-        const messageId = typeof rawMessageId === "string" ? rawMessageId : undefined;
-        const messageHash = crypto
-          .createHash("sha1")
-          .update(String(event.content ?? ""))
-          .digest("hex")
-          .slice(0, 16);
-
         if (routeSessionKey) {
           const now = Date.now();
-          routingSessionStore.setRouteDecision(routeSessionKey, {
-            sessionKey: routeSessionKey,
+          const baseDecision = {
             conversationId: ctx.conversationId,
             channelId: ctx.channelId,
             messageId,
@@ -1967,8 +2052,20 @@ export default function register(api: OpenClawPluginApi) {
             signals: Array.isArray(suggestion.signals) ? suggestion.signals : [],
             createdAtMs: now,
             expiresAtMs: now + ROUTE_DECISION_TTL_MS,
-            source: "message_received",
+            source: "message_received" as const,
+          };
+
+          routingSessionStore.setRouteDecision(routeSessionKey, {
+            sessionKey: routeSessionKey,
+            ...baseDecision,
           });
+
+          for (const alias of runtimeSessionAliases) {
+            routingSessionStore.setRouteDecision(alias, {
+              sessionKey: alias,
+              ...baseDecision,
+            });
+          }
 
           await appendJsonl(api, {
             ts: nowIso(),
@@ -1976,6 +2073,7 @@ export default function register(api: OpenClawPluginApi) {
             event: "route_decision_cached",
             dryRun: true,
             sessionKey: routeSessionKey,
+            runtimeSessionAliases,
             channelId: ctx.channelId,
             accountId: ctx.accountId,
             conversationId: ctx.conversationId,
@@ -1991,6 +2089,7 @@ export default function register(api: OpenClawPluginApi) {
             taskModeKinds: runtimeCfg.taskModeKinds,
             taskModeDisabledKinds: runtimeCfg.taskModeDisabledKinds,
             taskModeMinConfidence: runtimeCfg.taskModeMinConfidence,
+            stage: "post_enrichment",
           });
         }
 
