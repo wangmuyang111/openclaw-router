@@ -1,0 +1,21 @@
+{
+  "generatedAt": "2026-03-22T14:50:53.581Z",
+  "warnings": [],
+  "summary": {
+    "current": {
+      "total": 50,
+      "codingHits": 0,
+      "codingHigh": 0,
+      "codingMedium": 0,
+      "codingLow": 0
+    },
+    "worstCasePatched": {
+      "total": 50,
+      "codingHits": 0,
+      "codingHigh": 0,
+      "codingMedium": 0,
+      "codingLow": 0
+    }
+  },
+  "falsePositivesWorstCase": []
+}
