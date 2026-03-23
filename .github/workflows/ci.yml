@@ -20,7 +20,8 @@ jobs:
           $jsonFiles = Get-ChildItem -Recurse -Filter *.json
           foreach ($file in $jsonFiles) {
             Write-Host "Validating $($file.FullName)"
-            Get-Content $file.FullName | ConvertFrom-Json | Out-Null
+            # package-lock.json can contain empty-string property names; ConvertFrom-Json requires -AsHashtable for that.
+            Get-Content $file.FullName -Raw | ConvertFrom-Json -AsHashtable | Out-Null
           }
 
       - name: Check for sensitive data
@@ -164,18 +165,18 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $home = Join-Path $env:RUNNER_TEMP 'openclaw-home'
+          $openclawHome = Join-Path $env:RUNNER_TEMP 'openclaw-home'
           $workspace = Join-Path $env:RUNNER_TEMP 'openclaw-workspace'
           $fakeBin = Join-Path $env:RUNNER_TEMP 'fake-bin'
 
-          New-Item -ItemType Directory -Force -Path $home, $workspace, $fakeBin | Out-Null
+          New-Item -ItemType Directory -Force -Path $openclawHome, $workspace, $fakeBin | Out-Null
           @"
           {
             "plugins": {
               "entries": {}
             }
           }
-          "@ | Set-Content -Path (Join-Path $home 'openclaw.json') -Encoding UTF8
+          "@ | Set-Content -Path (Join-Path $openclawHome 'openclaw.json') -Encoding UTF8
 
           $shim = Join-Path $fakeBin 'openclaw.cmd'
           @"
@@ -188,7 +189,7 @@ jobs:
           exit /b 0
           "@ | Set-Content -Path $shim -Encoding ASCII
 
-          "OPENCLAW_HOME=$home" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "OPENCLAW_HOME=$openclawHome" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "OPENCLAW_WORKSPACE=$workspace" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           $fakeBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
