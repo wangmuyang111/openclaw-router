@@ -226,7 +226,18 @@ jobs:
         shell: bash
         run: |
           chmod +x scripts/*.sh
+
+          # doctor is expected to fail before install (workspace is empty)
+          set +e
           ./scripts/doctor.sh
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "Expected wrapper doctor to fail before install, but it succeeded." >&2
+            exit 1
+          fi
+          echo "Wrapper doctor failed as expected before install (exit $status)."
+
           ./scripts/install.sh --dry-run
           ./scripts/repair.sh --dry-run
 
@@ -234,7 +245,15 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          # doctor is expected to fail before install (workspace is empty)
           powershell -ExecutionPolicy Bypass -File .\scripts\doctor.ps1
+          $status = $LASTEXITCODE
+          if ($status -eq 0) {
+            Write-Error 'Expected wrapper doctor to fail before install, but it succeeded.'
+            exit 1
+          }
+          Write-Host "Wrapper doctor failed as expected before install (exit $status)."
+
           powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 --dry-run
           powershell -ExecutionPolicy Bypass -File .\scripts\repair.ps1 --dry-run
 
