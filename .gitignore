@@ -21,6 +21,12 @@ Thumbs.db
 /tmp_openclaw.json.*
 /tmp/
 
+# Extra local scratch (generated during install/experiments)
+/tmp_*.json
+/tmp_*.json.bak
+/tmp*.json
+/tmp*.json.bak
+
 # Generated caches
 /tools/soft-router-suggest/model-catalog.cache.json
 
