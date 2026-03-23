@@ -35,10 +35,9 @@ jobs:
             'dist\\'
           )
 
-          $files = Get-ChildItem -Recurse -File | Where-Object {
-            $path = $_.FullName
-            -not ($excludedPathPatterns | Where-Object { $path -match $_ })
-          }
+          # Only scan tracked files to avoid false positives from generated artifacts in CI workspaces.
+          $tracked = (git ls-files)
+          $files = $tracked | ForEach-Object { Get-Item $_ }
 
           $found = $false
 
