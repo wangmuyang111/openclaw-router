@@ -36,8 +36,8 @@ jobs:
           )
 
           # Only scan tracked files to avoid false positives from generated artifacts in CI workspaces.
-          $tracked = (git ls-files)
-          $files = $tracked | ForEach-Object { Get-Item $_ }
+          # Use core.quotepath=false so non-ASCII filenames (e.g. Chinese) are emitted as real paths on Windows.
+          $files = @(git -c core.quotepath=false ls-files)
 
           $found = $false
 
