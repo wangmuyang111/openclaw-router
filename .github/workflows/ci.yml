@@ -71,7 +71,7 @@ jobs:
             $found = $true
           }
 
-          # Any drive letter user profile path like C:\Users\name
+          # Any drive letter user profile path like %USERPROFILE% (avoid hardcoding real usernames)
           $realPathCandidates = $files | Select-String -Pattern '[A-Z]:\\\\Users\\\\[^\\\\]+'
           $realPathMatches = $realPathCandidates | Where-Object {
             $_.Line -notmatch '<你>|<your-username>|<your-|YOUR_USERNAME|%USERPROFILE%|RUNNER_TEMP|example|sample'
@@ -82,6 +82,15 @@ jobs:
               Write-Host ("$($_.Path):$($_.LineNumber): $($_.Line)")
             }
             $found = $true
+          }
+
+          # Any Windows runner workspace path like D:\a\... (not sensitive; false positive in CI logs)
+          $runnerPathCandidates = $files | Select-String -Pattern '[A-Z]:\\\\a\\\\'
+          $runnerPathMatches = $runnerPathCandidates | Where-Object {
+            $_.Line -notmatch 'RUNNER_TEMP|example|sample'
+          }
+          if ($runnerPathMatches) {
+            Write-Host 'Note: found Windows runner paths (D:\\a\\...), ignoring as non-sensitive.'
           }
 
           if ($found) {
