@@ -1,8 +1,8 @@
 {
   "$schema": "./keyword-library.schema.json",
   "version": 1,
-  "updatedAt": "2026-03-23T06:11:13.653Z",
-  "notes": "Simplified to 6 categories: strategy, coding, vision, support, general, chat. strategy merges planning + advanced_coding; support merges daily_support + emergency_fallback; quick_response keywords were fully preserved by merging into support/general/chat.\n[scheme B] move ambiguous short tokens (pip/CI/pipeline) out of contains sets; reintroduce via regex word-boundary/context patterns.\n[sync] merged coding keyword draft (coding关键词库.txt part1/2/3/4) keywordSets into keyword-library.json (sets only; not auto-wired).\n[cleanup] remove ambiguous tokens CI/pipeline from coding.feature.build_and_toolchain (handled by regex/safer phrases).\n[wiring] add coding.feature.package_files and coding.feature.build_and_toolchain to kinds.coding positive (weight=2).\n[fix] normalize regex pattern escape level (\\\\ -> \\) so RegExp() receives real regex escapes.\n[tune] set coding.minStrongHits=0 to improve recall for file/tooling signals.\n[tune] restore coding.minStrongHits=1 (use *.strong set ids to satisfy strongHit without raising weight).\n[tune] mark package_files/build_and_toolchain as strong by using *.strong set ids (counts as strongHit).\n[conservative] add small safe strong coding set for framework/tooling-specific terms (weight=2).\n[strategy scheme B] move race/architecture to regex word-boundary to avoid substring matches (trace/conceptual steals).\n[conservative] add context.Context/trace id (Go tracing) to safe coding strong set.\n[sql] wire coding.lang.sql.strong (weight=2) so natural-language prompts that mention 'SQL' (without SELECT/FROM) still hit coding under minStrongHits=1.\n[cleanup] dedup coding.lang.sql.strong terms to avoid double scoring (SQL vs SQL：).\n[sql] simplify coding.lang.sql.strong: keep only core tokens to avoid duplicate matches (SQL:, SQL：).\n[auto-hardening] trial enable: coding.feature.build_and_toolchain.strong, coding.feature.c_cpp.strong\n[auto-hardening] trial enable: coding.feature.csharp_dotnet.strong, coding.feature.error_codes.strong\n[auto-hardening] trial enable: coding.feature.java_jvm.strong, coding.feature.js_ts_node.strong\n[auto-hardening] trial enable: coding.feature.kotlin.strong, coding.feature.package_files.strong\n[auto-hardening] trial enable: coding.feature.php.strong, coding.feature.powershell.strong\n[auto-hardening] trial enable: coding.feature.python.strong, coding.feature.risky_or_generic_reference_only.strong\n[auto-hardening] trial enable: coding.feature.shell.strong, coding.feature.solidity.strong\n[auto-hardening] trial enable: coding.feature.sql.strong, coding.feature.swift_objc.strong\n[auto-hardening] trial enable: coding.lang.abbrev.safe.strong, coding.lang.dsl_and_data.strong\n[auto-hardening] trial enable: coding.scenario.c_cpp.strong, coding.scenario.c_cpp_tooling_modern.strong\n[auto-hardening] trial enable: coding.scenario.common.db.strong, coding.scenario.common.devops.strong\n[auto-hardening] trial enable: coding.scenario.csharp_dotnet.strong, coding.scenario.dart_flutter.strong\n[auto-hardening] trial enable: coding.scenario.dotnet_ecosystem.strong, coding.scenario.erlang_elixir.strong\n[auto-hardening] trial enable: coding.scenario.go.strong, coding.scenario.go_ecosystem.strong\n[auto-hardening] trial enable: coding.scenario.haskell.strong, coding.scenario.hdl.strong\n[auto-hardening] trial enable: coding.scenario.java_jvm.strong, coding.scenario.java_wrappers.strong\n[auto-hardening] trial enable: coding.scenario.js_lint_format_modern.strong, coding.scenario.js_monorepo_tooling.strong\n[auto-hardening] trial enable: coding.scenario.kotlin_android.strong, coding.scenario.matlab_r.strong\n[auto-hardening] trial enable: coding.scenario.php.strong, coding.scenario.powershell.strong\n[auto-hardening] trial enable: coding.scenario.python.strong, coding.scenario.python_tooling_modern.strong\n[auto-hardening] trial enable: coding.scenario.rust_ecosystem.strong, coding.scenario.scala.strong\n[auto-hardening] trial enable: coding.scenario.shell.strong, coding.scenario.solidity.strong\n[auto-hardening] trial enable: coding.scenario.sql.strong, coding.scenario.swift_ios.strong\n[auto-hardening] trial enable: coding.feature.kotlin.strong, coding.feature.package_files.strong\n[auto-hardening] trial enable: coding.feature.php.strong, coding.feature.powershell.strong\n[auto-hardening] trial enable: coding.feature.python.strong, coding.feature.risky_or_generic_reference_only.strong\n[auto-hardening] trial enable: coding.feature.shell.strong, coding.feature.solidity.strong\n[auto-hardening] trial enable: coding.feature.sql.strong, coding.feature.swift_objc.strong\n[auto-hardening] trial enable: coding.lang.abbrev.safe.strong, coding.lang.dsl_and_data.strong\n[auto-hardening] trial enable: coding.scenario.c_cpp.strong, coding.scenario.c_cpp_tooling_modern.strong\n[auto-hardening] trial enable: coding.scenario.common.db.strong, coding.scenario.common.devops.strong\n[auto-hardening] trial enable: coding.scenario.csharp_dotnet.strong, coding.scenario.dart_flutter.strong\n[auto-hardening] trial enable: coding.scenario.dotnet_ecosystem.strong, coding.scenario.erlang_elixir.strong\n[auto-hardening] trial enable: coding.scenario.go.strong, coding.scenario.go_ecosystem.strong\n[auto-hardening] trial enable: coding.scenario.haskell.strong, coding.scenario.hdl.strong\n[auto-hardening] trial enable: coding.scenario.java_jvm.strong, coding.scenario.java_wrappers.strong\n[auto-hardening] trial enable: coding.scenario.js_lint_format_modern.strong, coding.scenario.js_monorepo_tooling.strong\n[auto-hardening] trial enable: coding.scenario.kotlin_android.strong, coding.scenario.matlab_r.strong\n[auto-hardening] trial enable: coding.scenario.php.strong, coding.scenario.powershell.strong\n[auto-hardening] trial enable: coding.scenario.python.strong, coding.scenario.python_tooling_modern.strong\n[auto-hardening] trial enable: coding.scenario.rust_ecosystem.strong, coding.scenario.scala.strong\n[auto-hardening] trial enable: coding.scenario.shell.strong, coding.scenario.solidity.strong\n[auto-hardening] trial enable: coding.scenario.sql.strong, coding.scenario.swift_ios.strong\n[regex-bounds] add contextful word-boundary regex for language mentions, rails/bun commands, verilog reg, and filename extensions.\n[fix] correct regex escape level for contextful word-boundary patterns.\n[fix] remove overly broad filename/file-ext regex (docs.rs false positive).\n[fix] split Python/Rust regex into CN/EN variants (JS \\b does not work after CJK tokens).\n[route-fix] TypeScript, debounce, remove:support.weak:支持\n[fix] promote TypeScript/debounce to coding.strong (contains) and drop their regex; keep support.weak without ambiguous token 支持.",
+  "updatedAt": "2026-03-23T06:37:20.734Z",
+  "notes": "Simplified to 6 categories: strategy, coding, vision, support, general, chat. strategy merges planning + advanced_coding; support merges daily_support + emergency_fallback; quick_response keywords were fully preserved by merging into support/general/chat.\n[scheme B] move ambiguous short tokens (pip/CI/pipeline) out of contains sets; reintroduce via regex word-boundary/context patterns.\n[sync] merged coding keyword draft (coding关键词库.txt part1/2/3/4) keywordSets into keyword-library.json (sets only; not auto-wired).\n[cleanup] remove ambiguous tokens CI/pipeline from coding.feature.build_and_toolchain (handled by regex/safer phrases).\n[wiring] add coding.feature.package_files and coding.feature.build_and_toolchain to kinds.coding positive (weight=2).\n[fix] normalize regex pattern escape level (\\\\ -> \\) so RegExp() receives real regex escapes.\n[tune] set coding.minStrongHits=0 to improve recall for file/tooling signals.\n[tune] restore coding.minStrongHits=1 (use *.strong set ids to satisfy strongHit without raising weight).\n[tune] mark package_files/build_and_toolchain as strong by using *.strong set ids (counts as strongHit).\n[conservative] add small safe strong coding set for framework/tooling-specific terms (weight=2).\n[strategy scheme B] move race/architecture to regex word-boundary to avoid substring matches (trace/conceptual steals).\n[conservative] add context.Context/trace id (Go tracing) to safe coding strong set.\n[sql] wire coding.lang.sql.strong (weight=2) so natural-language prompts that mention 'SQL' (without SELECT/FROM) still hit coding under minStrongHits=1.\n[cleanup] dedup coding.lang.sql.strong terms to avoid double scoring (SQL vs SQL：).\n[sql] simplify coding.lang.sql.strong: keep only core tokens to avoid duplicate matches (SQL:, SQL：).\n[auto-hardening] trial enable: coding.feature.build_and_toolchain.strong, coding.feature.c_cpp.strong\n[auto-hardening] trial enable: coding.feature.csharp_dotnet.strong, coding.feature.error_codes.strong\n[auto-hardening] trial enable: coding.feature.java_jvm.strong, coding.feature.js_ts_node.strong\n[auto-hardening] trial enable: coding.feature.kotlin.strong, coding.feature.package_files.strong\n[auto-hardening] trial enable: coding.feature.php.strong, coding.feature.powershell.strong\n[auto-hardening] trial enable: coding.feature.python.strong, coding.feature.risky_or_generic_reference_only.strong\n[auto-hardening] trial enable: coding.feature.shell.strong, coding.feature.solidity.strong\n[auto-hardening] trial enable: coding.feature.sql.strong, coding.feature.swift_objc.strong\n[auto-hardening] trial enable: coding.lang.abbrev.safe.strong, coding.lang.dsl_and_data.strong\n[auto-hardening] trial enable: coding.scenario.c_cpp.strong, coding.scenario.c_cpp_tooling_modern.strong\n[auto-hardening] trial enable: coding.scenario.common.db.strong, coding.scenario.common.devops.strong\n[auto-hardening] trial enable: coding.scenario.csharp_dotnet.strong, coding.scenario.dart_flutter.strong\n[auto-hardening] trial enable: coding.scenario.dotnet_ecosystem.strong, coding.scenario.erlang_elixir.strong\n[auto-hardening] trial enable: coding.scenario.go.strong, coding.scenario.go_ecosystem.strong\n[auto-hardening] trial enable: coding.scenario.haskell.strong, coding.scenario.hdl.strong\n[auto-hardening] trial enable: coding.scenario.java_jvm.strong, coding.scenario.java_wrappers.strong\n[auto-hardening] trial enable: coding.scenario.js_lint_format_modern.strong, coding.scenario.js_monorepo_tooling.strong\n[auto-hardening] trial enable: coding.scenario.kotlin_android.strong, coding.scenario.matlab_r.strong\n[auto-hardening] trial enable: coding.scenario.php.strong, coding.scenario.powershell.strong\n[auto-hardening] trial enable: coding.scenario.python.strong, coding.scenario.python_tooling_modern.strong\n[auto-hardening] trial enable: coding.scenario.rust_ecosystem.strong, coding.scenario.scala.strong\n[auto-hardening] trial enable: coding.scenario.shell.strong, coding.scenario.solidity.strong\n[auto-hardening] trial enable: coding.scenario.sql.strong, coding.scenario.swift_ios.strong\n[auto-hardening] trial enable: coding.feature.kotlin.strong, coding.feature.package_files.strong\n[auto-hardening] trial enable: coding.feature.php.strong, coding.feature.powershell.strong\n[auto-hardening] trial enable: coding.feature.python.strong, coding.feature.risky_or_generic_reference_only.strong\n[auto-hardening] trial enable: coding.feature.shell.strong, coding.feature.solidity.strong\n[auto-hardening] trial enable: coding.feature.sql.strong, coding.feature.swift_objc.strong\n[auto-hardening] trial enable: coding.lang.abbrev.safe.strong, coding.lang.dsl_and_data.strong\n[auto-hardening] trial enable: coding.scenario.c_cpp.strong, coding.scenario.c_cpp_tooling_modern.strong\n[auto-hardening] trial enable: coding.scenario.common.db.strong, coding.scenario.common.devops.strong\n[auto-hardening] trial enable: coding.scenario.csharp_dotnet.strong, coding.scenario.dart_flutter.strong\n[auto-hardening] trial enable: coding.scenario.dotnet_ecosystem.strong, coding.scenario.erlang_elixir.strong\n[auto-hardening] trial enable: coding.scenario.go.strong, coding.scenario.go_ecosystem.strong\n[auto-hardening] trial enable: coding.scenario.haskell.strong, coding.scenario.hdl.strong\n[auto-hardening] trial enable: coding.scenario.java_jvm.strong, coding.scenario.java_wrappers.strong\n[auto-hardening] trial enable: coding.scenario.js_lint_format_modern.strong, coding.scenario.js_monorepo_tooling.strong\n[auto-hardening] trial enable: coding.scenario.kotlin_android.strong, coding.scenario.matlab_r.strong\n[auto-hardening] trial enable: coding.scenario.php.strong, coding.scenario.powershell.strong\n[auto-hardening] trial enable: coding.scenario.python.strong, coding.scenario.python_tooling_modern.strong\n[auto-hardening] trial enable: coding.scenario.rust_ecosystem.strong, coding.scenario.scala.strong\n[auto-hardening] trial enable: coding.scenario.shell.strong, coding.scenario.solidity.strong\n[auto-hardening] trial enable: coding.scenario.sql.strong, coding.scenario.swift_ios.strong\n[regex-bounds] add contextful word-boundary regex for language mentions, rails/bun commands, verilog reg, and filename extensions.\n[fix] correct regex escape level for contextful word-boundary patterns.\n[fix] remove overly broad filename/file-ext regex (docs.rs false positive).\n[fix] split Python/Rust regex into CN/EN variants (JS \\b does not work after CJK tokens).\n[route-fix] TypeScript, debounce, remove:support.weak:支持\n[fix] promote TypeScript/debounce to coding.strong (contains) and drop their regex; keep support.weak without ambiguous token 支持.\n[wiring] wire ALL coding.* keywordSets into kinds.coding positive (weight=3).\n[wiring] exclude coding.abbrev.risky_reference_only from positive wiring (reference-only).",
   "defaultFallbackKind": "chat",
   "normalization": {
     "lowercase": true,
@@ -2791,253 +2791,573 @@
       "signals": {
         "positive": [
           {
+            "set": "coding.conservative.safe.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.build_and_toolchain",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.build_and_toolchain.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.c_cpp",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.c_cpp.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.csharp_dotnet",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.csharp_dotnet.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.error_codes",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.error_codes.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.go",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.hdl",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.java_jvm",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.java_jvm.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.js_ts_node",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.js_ts_node.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.kotlin",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.kotlin.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.package_files",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.package_files.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.php",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.php.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.powershell",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.powershell.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.python",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.python.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.risky_or_generic_reference_only",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.risky_or_generic_reference_only.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.ruby",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.rust",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.shell",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.shell.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.solidity",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.solidity.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.sql",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.sql.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.swift_objc",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.swift_objc.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.lang.abbrev.safe",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.lang.abbrev.safe.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.lang.dsl_and_data",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.lang.dsl_and_data.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.lang.file_ext",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.lang.full",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.lang.sql.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.regex.medium",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.regex.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.c_cpp",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.c_cpp.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.c_cpp_tooling_modern",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.c_cpp_tooling_modern.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.clojure_lisp",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.common.build_and_ci",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.common.db",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.common.db.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.common.devops",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.common.devops.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.common.ml_data",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.common.package_manager",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.common.test_framework",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.common.web_backend",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.csharp_dotnet",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.csharp_dotnet.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.dart_flutter",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.dart_flutter.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.dotnet_ecosystem",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.dotnet_ecosystem.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.erlang_elixir",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.erlang_elixir.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.go",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.go.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.go_ecosystem",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.go_ecosystem.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.haskell",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.haskell.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.hdl",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.hdl.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.java_jvm",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.java_jvm.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.java_wrappers",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.java_wrappers.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.js_lint_format_modern",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.js_lint_format_modern.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.js_monorepo_tooling",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.js_monorepo_tooling.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.js_runtime_modern",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.js_ts_node",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.kotlin_android",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.kotlin_android.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.matlab_r",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.matlab_r.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.php",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.php.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.powershell",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.powershell.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.python",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.python.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.python_tooling_modern",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.python_tooling_modern.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.ruby",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.rust",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.rust_ecosystem",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.rust_ecosystem.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.scala",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.scala.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.shell",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.shell.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.solidity",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.solidity.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.sql",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.sql.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.swift_ios",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.scenario.swift_ios.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
             "set": "coding.strong",
             "weight": 3,
             "match": "contains"
           },
           {
             "set": "coding.weak",
-            "weight": 1,
-            "match": "contains"
-          },
-          {
-            "set": "coding.feature.package_files.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.feature.build_and_toolchain.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.conservative.safe.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.lang.sql.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.feature.c_cpp.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.feature.csharp_dotnet.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.feature.error_codes.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.feature.java_jvm.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.feature.js_ts_node.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.feature.kotlin.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.feature.php.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.feature.powershell.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.feature.python.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.feature.risky_or_generic_reference_only.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.feature.shell.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.feature.solidity.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.feature.sql.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.feature.swift_objc.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.lang.abbrev.safe.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.lang.dsl_and_data.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.c_cpp.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.c_cpp_tooling_modern.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.common.db.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.common.devops.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.csharp_dotnet.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.dart_flutter.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.dotnet_ecosystem.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.erlang_elixir.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.go.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.go_ecosystem.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.haskell.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.hdl.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.java_jvm.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.java_wrappers.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.js_lint_format_modern.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.js_monorepo_tooling.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.kotlin_android.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.matlab_r.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.php.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.powershell.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.python.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.python_tooling_modern.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.rust_ecosystem.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.scala.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.shell.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.solidity.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.sql.strong",
-            "weight": 2,
-            "match": "contains"
-          },
-          {
-            "set": "coding.scenario.swift_ios.strong",
-            "weight": 2,
+            "weight": 3,
             "match": "contains"
           }
         ],
