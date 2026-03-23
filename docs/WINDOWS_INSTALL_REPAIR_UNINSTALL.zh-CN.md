@@ -15,7 +15,7 @@
 - 本仓库路径假设为：
 
   ```powershell
-  C:\Users\<你>\Desktop\OpenClaw-SoftRouter-GitHub
+  %USERPROFILE%\\Desktop\\OpenClaw-SoftRouter-GitHub
   ```
 
 - OpenClaw 主目录（脚本自动推断）：
@@ -45,7 +45,7 @@
 在 **PowerShell 5.1** 中执行：
 
 ```powershell
-cd C:\Users\<你>\Desktop\OpenClaw-SoftRouter-GitHub
+cd %USERPROFILE%\\Desktop\\OpenClaw-SoftRouter-GitHub
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 
 .\scripts\install.ps1
@@ -164,7 +164,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 安装完成后，日常只需使用 `router.ps1` 即可：
 
 ```powershell
-cd C:\Users\<你>\Desktop\OpenClaw-SoftRouter-GitHub
+cd %USERPROFILE%\\Desktop\\OpenClaw-SoftRouter-GitHub
 
 # 查看当前模式
 .\scripts\router.ps1 status
@@ -227,7 +227,7 @@ cd C:\Users\<你>\Desktop\OpenClaw-SoftRouter-GitHub
 1. 在仓库根目录运行：
 
    ```powershell
-   cd C:\Users\<你>\Desktop\OpenClaw-SoftRouter-GitHub
+   cd %USERPROFILE%\\Desktop\\OpenClaw-SoftRouter-GitHub
    .\scripts\install.ps1
    ```
 
@@ -273,7 +273,7 @@ cd C:\Users\<你>\Desktop\OpenClaw-SoftRouter-GitHub
    - 使用仓库中提供的基线重置脚本：
 
      ```powershell
-     cd C:\Users\<你>\Desktop\OpenClaw-SoftRouter-GitHub\tools\soft-router-suggest
+     cd %USERPROFILE%\\Desktop\\OpenClaw-SoftRouter-GitHub\tools\soft-router-suggest
      .\RESET_TO_BASELINE.ps1         # 正常会有确认提示
      # 或强制跳过确认：
      # .\RESET_TO_BASELINE.ps1 -Force
@@ -288,7 +288,7 @@ cd C:\Users\<你>\Desktop\OpenClaw-SoftRouter-GitHub
 3. 重置后，为确保工作区与仓库完全同步，建议再执行一次安装脚本：
 
    ```powershell
-   cd C:\Users\<你>\Desktop\OpenClaw-SoftRouter-GitHub
+   cd %USERPROFILE%\\Desktop\\OpenClaw-SoftRouter-GitHub
    .\scripts\install.ps1
    ```
 
@@ -320,7 +320,7 @@ cd C:\Users\<你>\Desktop\OpenClaw-SoftRouter-GitHub
 2. 使用 `install.ps1` 重新写入安全默认配置（不会删除其他插件配置）：
 
    ```powershell
-   cd C:\Users\<你>\Desktop\OpenClaw-SoftRouter-GitHub
+   cd %USERPROFILE%\\Desktop\\OpenClaw-SoftRouter-GitHub
    .\scripts\install.ps1
    ```
 
@@ -347,13 +347,13 @@ cd C:\Users\<你>\Desktop\OpenClaw-SoftRouter-GitHub
 2. 克隆本仓库到任意位置（推荐桌面或工作目录），如：
 
    ```powershell
-   git clone https://github.com/<your-username>/OpenClaw-SoftRouter.git C:\Users\<你>\Desktop\OpenClaw-SoftRouter-GitHub
+   git clone https://github.com/<your-username>/OpenClaw-SoftRouter.git %USERPROFILE%\\Desktop\\OpenClaw-SoftRouter-GitHub
    ```
 
 3. 直接执行安装脚本：
 
    ```powershell
-   cd C:\Users\<你>\Desktop\OpenClaw-SoftRouter-GitHub
+   cd %USERPROFILE%\\Desktop\\OpenClaw-SoftRouter-GitHub
    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
    .\scripts\install.ps1
    .\scripts\doctor.ps1
@@ -383,7 +383,7 @@ cd C:\Users\<你>\Desktop\OpenClaw-SoftRouter-GitHub
 #### 方式 A：使用 `uninstall.ps1`（只禁用）
 
 ```powershell
-cd C:\Users\<你>\Desktop\OpenClaw-SoftRouter-GitHub
+cd %USERPROFILE%\\Desktop\\OpenClaw-SoftRouter-GitHub
 .\scripts\uninstall.ps1
 ```
 
@@ -396,7 +396,7 @@ cd C:\Users\<你>\Desktop\OpenClaw-SoftRouter-GitHub
 #### 方式 B：使用 `router.ps1 fast`
 
 ```powershell
-cd C:\Users\<你>\Desktop\OpenClaw-SoftRouter-GitHub
+cd %USERPROFILE%\\Desktop\\OpenClaw-SoftRouter-GitHub
 .\scripts\router.ps1 fast
 ```
 
@@ -417,7 +417,7 @@ cd C:\Users\<你>\Desktop\OpenClaw-SoftRouter-GitHub
 执行：
 
 ```powershell
-cd C:\Users\<你>\Desktop\OpenClaw-SoftRouter-GitHub
+cd %USERPROFILE%\\Desktop\\OpenClaw-SoftRouter-GitHub
 .\scripts\uninstall.ps1 -RemoveFiles
 ```
 
@@ -471,3 +471,5 @@ cd C:\Users\<你>\Desktop\OpenClaw-SoftRouter-GitHub
 
 - 别人在任何 Windows 机器上按本文即可完成 **安装 → 验证 → 修复 → 卸载** 全链路
 - 仓库对外公开时不会泄露你的个人配置与凭据。
+
+

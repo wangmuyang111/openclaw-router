@@ -3,7 +3,7 @@
 ## 1. 提交前检查
 
 ```powershell
-cd C:\Users\muyang\Desktop\OpenClaw-SoftRouter-GitHub
+cd %USERPROFILE%\Desktop\OpenClaw-SoftRouter-GitHub
 
 git status --short
 .\scripts\doctor.ps1

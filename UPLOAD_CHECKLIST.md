@@ -78,7 +78,7 @@
 
 ### 2. 检查敏感信息
 ```powershell
-Get-ChildItem -Recurse -File | Select-String -Pattern "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}|C:\Users\[^\]+|token\"\s*:\s*\""
+Get-ChildItem -Recurse -File | Select-String -Pattern "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}|[A-Z]:\\Users\\[^\\]+|token\"\s*:\s*\""
 ```
 
 ### 3. 构建、安装与检查

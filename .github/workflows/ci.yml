@@ -71,7 +71,8 @@ jobs:
             $found = $true
           }
 
-          $realPathCandidates = $files | Select-String -Pattern 'C:\\Users\\[^\\]+'
+          # Any drive letter user profile path like C:\Users\name
+          $realPathCandidates = $files | Select-String -Pattern '[A-Z]:\\\\Users\\\\[^\\\\]+'
           $realPathMatches = $realPathCandidates | Where-Object {
             $_.Line -notmatch '<你>|<your-username>|<your-|YOUR_USERNAME|%USERPROFILE%|RUNNER_TEMP|example|sample'
           }
