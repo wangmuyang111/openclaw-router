@@ -200,6 +200,7 @@ jobs:
           set +e
           node ./dist/cli/index.js doctor
           status=$?
+          set -e
           if [ "$status" -eq 0 ]; then
             echo "Expected doctor to fail before install, but it succeeded." >&2
             exit 1
@@ -217,6 +218,8 @@ jobs:
             exit 1
           }
           Write-Host "Doctor failed as expected before install (exit $status)."
+          # GitHub Actions uses the last native command's exit code; reset it so this step succeeds.
+          $global:LASTEXITCODE = 0
 
       - name: CLI install dry-run smoke test
         run: node ./dist/cli/index.js install --dry-run
@@ -253,6 +256,7 @@ jobs:
             exit 1
           }
           Write-Host "Wrapper doctor failed as expected before install (exit $status)."
+          $global:LASTEXITCODE = 0
 
           powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 --dry-run
           powershell -ExecutionPolicy Bypass -File .\scripts\repair.ps1 --dry-run
@@ -305,3 +309,4 @@ jobs:
             exit 1
           }
           Write-Host "Doctor failed as expected after remove-files (exit $status)."
+          $global:LASTEXITCODE = 0
