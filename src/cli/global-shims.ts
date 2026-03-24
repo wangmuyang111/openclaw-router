@@ -55,6 +55,27 @@ function buildPosixShim(scriptWrapperPath: string): string {
   return `#!/usr/bin/env sh\nexec '${wrapper}' "$@"\n`;
 }
 
+function toWslPath(winPath: string): string {
+  // C:\Users\me\x -> /mnt/c/Users/me/x
+  const normalized = winPath.replace(/\\/g, "/");
+  const match = /^([A-Za-z]):\/(.*)$/.exec(normalized);
+  if (!match) return normalized;
+  const drive = match[1].toLowerCase();
+  const rest = match[2];
+  return `/mnt/${drive}/${rest}`;
+}
+
+function buildWslShim(args: {
+  wslRepoRoot: string;
+  wslOpenClawHome: string;
+}): string {
+  const repo = args.wslRepoRoot.replace(/'/g, `'\\''`);
+  const home = args.wslOpenClawHome.replace(/'/g, `'\\''`);
+  // Use bash explicitly so the repo script can stay bash.
+  // IMPORTANT: escape ${...} so TypeScript template literals don't try to interpolate them.
+  return `#!/usr/bin/env sh\nset -e\n: "\${OPENCLAW_HOME:='${home}'}"\n: "\${OPENCLAW_WORKSPACE:=\${OPENCLAW_HOME}/workspace}"\n: "\${OPENCLAW_CONFIG_PATH:=\${OPENCLAW_HOME}/openclaw.json}"\nexport OPENCLAW_HOME OPENCLAW_WORKSPACE OPENCLAW_CONFIG_PATH\nexec bash '${repo}/scripts/openclaw-router' "$@"\n`;
+}
+
 function getShimPath(binDir: string, commandName: string): string {
   return process.platform === "win32" ? path.join(binDir, `${commandName}.cmd`) : path.join(binDir, commandName);
 }
@@ -74,12 +95,18 @@ export async function installGlobalShims(): Promise<ShimInstallResult> {
   const target = await resolveShimBinDir();
   await mkdir(target.binDir, { recursive: true });
 
+  const isWsl = Boolean(process.env.WSL_DISTRO_NAME) || Boolean(process.env.WSL_INTEROP);
+
   for (const commandName of SHIM_COMMANDS) {
     const shimPath = getShimPath(target.binDir, commandName);
     if (process.platform === "win32") {
       await writeFile(shimPath, buildWindowsCmdShim(scriptWrapperPath), "utf8");
     } else {
-      if (commandName === "openclaw-router") {
+      if (isWsl) {
+        const wslRepoRoot = toWslPath(getRepoRoot());
+        const wslOpenClawHome = toWslPath(getOpenClawHome());
+        await writeFile(shimPath, buildWslShim({ wslRepoRoot, wslOpenClawHome }), "utf8");
+      } else if (commandName === "openclaw-router") {
         await copyFile(scriptWrapperPath, shimPath);
       } else {
         await writeFile(shimPath, buildPosixShim(scriptWrapperPath), "utf8");
