@@ -1,4 +1,4 @@
-{
+﻿{
   "taskModeEnabled": false,
   "taskModePrimaryKind": "coding",
   "taskModeKinds": [
@@ -6,7 +6,7 @@
   ],
   "taskModeDisabledKinds": [],
   "taskModeMinConfidence": "medium",
-  "taskModeReturnToPrimary": false,
-  "taskModeAllowAutoDowngrade": true,
-  "freeSwitchWhenTaskModeOff": true
+  "taskModeReturnToPrimary": true,
+  "taskModeAllowAutoDowngrade": false,
+  "freeSwitchWhenTaskModeOff": false
 }

@@ -41,7 +41,7 @@ function Get-DefaultRuntimeRouting {
     taskModeMinConfidence = 'medium'
     taskModeReturnToPrimary = $true
     taskModeAllowAutoDowngrade = $false
-    freeSwitchWhenTaskModeOff = $true
+    freeSwitchWhenTaskModeOff = $false
   }
 }
 
@@ -81,8 +81,8 @@ function Load-RuntimeRouting {
     taskModePrimaryKind = $primaryKind
     taskModeKinds = if ($taskKinds.Count -gt 0) { $taskKinds } else { @($defaults.taskModeKinds) }
     taskModeDisabledKinds = $disabledKinds
-    taskModeMinConfidence = if (@('low','medium','high') -contains ([string]$raw.taskModeMinConfidence).ToLowerInvariant()) { ([string]$raw.taskModeMinConfidence).ToLowerInvariant() } else { [string]$defaults.taskModeMinConfidence }
-    taskModeReturnToPrimary = if ($raw.PSObject.Properties.Name -contains 'taskModeReturnToPrimary') { [bool]$raw.taskModeReturnToPrimary } else { [bool]$defaults.taskModeReturnToPrimary }
+    taskModeMinConfidence = if (@('medium','high') -contains ([string]$raw.taskModeMinConfidence).ToLowerInvariant()) { ([string]$raw.taskModeMinConfidence).ToLowerInvariant() } else { 'medium' }
+    taskModeReturnToPrimary = $true
     taskModeAllowAutoDowngrade = if ($raw.PSObject.Properties.Name -contains 'taskModeAllowAutoDowngrade') { [bool]$raw.taskModeAllowAutoDowngrade } else { [bool]$defaults.taskModeAllowAutoDowngrade }
     freeSwitchWhenTaskModeOff = if ($raw.PSObject.Properties.Name -contains 'freeSwitchWhenTaskModeOff') { [bool]$raw.freeSwitchWhenTaskModeOff } else { [bool]$defaults.freeSwitchWhenTaskModeOff }
   }
@@ -1077,16 +1077,14 @@ function Run-TaskModeMenu {
       '3' { Run-TaskModeKindsMenu }
       '4' {
         Write-Host (T 'taskMode.pickConfidence') -ForegroundColor Cyan
-        Write-Host '1) low'
-        Write-Host '2) medium'
-        Write-Host '3) high'
+        Write-Host '1) medium'
+        Write-Host '2) high'
         Write-Host ("0) " + (T 'menu.back'))
-        $pick = Read-ChoiceOrEsc (Tf 'prompt.chooseMenu' @(3))
+        $pick = Read-ChoiceOrEsc (Tf 'prompt.chooseMenu' @(2))
         if ($null -eq $pick -or $pick -eq '0') { continue }
         switch ($pick) {
-          '1' { $cfg.taskModeMinConfidence = 'low' }
-          '2' { $cfg.taskModeMinConfidence = 'medium' }
-          '3' { $cfg.taskModeMinConfidence = 'high' }
+          '1' { $cfg.taskModeMinConfidence = 'medium' }
+          '2' { $cfg.taskModeMinConfidence = 'high' }
           default { continue }
         }
         Save-RuntimeRouting $cfg
@@ -1095,9 +1093,7 @@ function Run-TaskModeMenu {
       }
       '5' { Show-TaskModePrimaryModelList $cfg }
       '6' {
-        $picked = Select-OnOff (T 'taskMode.returnToPrimary') ([bool]$cfg.taskModeReturnToPrimary)
-        if ($null -eq $picked) { continue }
-        $cfg.taskModeReturnToPrimary = [bool]$picked
+        $cfg.taskModeReturnToPrimary = $true
         Save-RuntimeRouting $cfg
         Write-Host (T 'taskMode.saved') -ForegroundColor Green
         Wait-AnyKeyOrEsc

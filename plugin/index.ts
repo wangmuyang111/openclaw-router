@@ -1189,14 +1189,16 @@ async function getRuntimeRoutingConfig(api: OpenClawPluginApi): Promise<RuntimeR
 
   const taskModePrimaryKind =
     typeof raw?.taskModePrimaryKind === "string" && raw.taskModePrimaryKind.trim()
-      ? raw.taskModePrimaryKind.trim()
+      ? raw.taskModePrimaryKind.trim().toLowerCase() === "chat"
+        ? defaults.taskModePrimaryKind
+        : raw.taskModePrimaryKind.trim()
       : defaults.taskModePrimaryKind;
   const taskModeKinds = Array.isArray(raw?.taskModeKinds)
     ? Array.from(
         new Set(
           raw.taskModeKinds
-            .map((value) => String(value ?? "").trim())
-            .filter((value) => value.length > 0),
+            .map((value) => String(value ?? "").trim().toLowerCase())
+            .filter((value) => value.length > 0 && value !== "chat"),
         ),
       )
     : defaults.taskModeKinds;
@@ -1208,8 +1210,8 @@ async function getRuntimeRoutingConfig(api: OpenClawPluginApi): Promise<RuntimeR
     ? Array.from(
         new Set(
           raw.taskModeDisabledKinds
-            .map((value) => String(value ?? "").trim())
-            .filter((value) => value.length > 0),
+            .map((value) => String(value ?? "").trim().toLowerCase())
+            .filter((value) => value.length > 0 && value !== "chat"),
         ),
       )
     : defaults.taskModeDisabledKinds;
@@ -1223,16 +1225,14 @@ async function getRuntimeRoutingConfig(api: OpenClawPluginApi): Promise<RuntimeR
         ? Array.from(new Set([taskModePrimaryKind, ...taskModeKinds]))
         : defaults.taskModeKinds,
     taskModeDisabledKinds: taskModeDisabledKinds.filter((kind) => kind !== taskModePrimaryKind),
-    taskModeMinConfidence:
+    taskModeMinConfidence: getEffectiveTaskModeMinConfidence(
       raw?.taskModeMinConfidence === "low" ||
       raw?.taskModeMinConfidence === "medium" ||
       raw?.taskModeMinConfidence === "high"
         ? raw.taskModeMinConfidence
         : defaults.taskModeMinConfidence,
-    taskModeReturnToPrimary:
-      typeof raw?.taskModeReturnToPrimary === "boolean"
-        ? raw.taskModeReturnToPrimary
-        : defaults.taskModeReturnToPrimary,
+    ),
+    taskModeReturnToPrimary: true,
     taskModeReturnModel,
     taskModeAllowAutoDowngrade:
       typeof raw?.taskModeAllowAutoDowngrade === "boolean"
@@ -1387,8 +1387,15 @@ function isLongTaskKind(kind: string): boolean {
   return LONG_TASK_KINDS.has(String(kind ?? "").trim().toLowerCase());
 }
 
+function getEffectiveTaskModeMinConfidence(
+  confidence: RuntimeRoutingConfig["taskModeMinConfidence"],
+): RuntimeRoutingConfig["taskModeMinConfidence"] {
+  return confidence === "high" ? "high" : "medium";
+}
+
 function isTaskModeKind(kind: string, runtimeCfg: RuntimeRoutingConfig): boolean {
   const normalized = String(kind ?? "").trim().toLowerCase();
+  if (!normalized || normalized === "chat") return false;
   const enabled = runtimeCfg.taskModeKinds.some((value) => value.toLowerCase() === normalized);
   const disabled = runtimeCfg.taskModeDisabledKinds.some((value) => value.toLowerCase() === normalized);
   return enabled && !disabled;
@@ -1671,7 +1678,8 @@ export default function register(api: OpenClawPluginApi) {
 
           const qualifiesAsTask =
             isTaskModeKind(decision.kind, runtimeCfg) &&
-            confidenceRank(decision.confidence) >= confidenceRank(runtimeCfg.taskModeMinConfidence);
+            confidenceRank(decision.confidence) >=
+              confidenceRank(getEffectiveTaskModeMinConfidence(runtimeCfg.taskModeMinConfidence));
 
           if (qualifiesAsTask) {
             const wantsTemporary = decision.kind !== nextTaskState.primaryKind;
@@ -1724,8 +1732,21 @@ export default function register(api: OpenClawPluginApi) {
             if (nextTaskState.temporaryModel && !areModelsEquivalent(nextTaskState.temporaryModel, nextTaskState.primaryModel)) {
               targetModel = nextTaskState.temporaryModel;
               targetKind = nextTaskState.temporaryKind ?? decision.kind;
-              logEvent = "task_mode_temp_override_applied";
-              logNote = `task mode temporary override from ${nextTaskState.primaryKind}(${nextTaskState.primaryModel}) to ${targetKind}(${targetModel})`;
+              if (String(targetKind ?? "").trim().toLowerCase() === "chat") {
+                targetKind = nextTaskState.primaryKind;
+                targetModel = nextTaskState.primaryModel;
+                nextTaskState = {
+                  ...nextTaskState,
+                  temporaryKind: undefined,
+                  temporaryModel: undefined,
+                  lastRouteAt: Date.now(),
+                };
+                logEvent = "task_mode_primary_kept";
+                logNote = `task mode blocked chat fallback and kept primary ${nextTaskState.primaryKind}(${nextTaskState.primaryModel})`;
+              } else {
+                logEvent = "task_mode_temp_override_applied";
+                logNote = `task mode temporary override from ${nextTaskState.primaryKind}(${nextTaskState.primaryModel}) to ${targetKind}(${targetModel})`;
+              }
             } else {
               targetModel = nextTaskState.primaryModel;
               targetKind = nextTaskState.primaryKind;
@@ -1738,20 +1759,20 @@ export default function register(api: OpenClawPluginApi) {
             const hadTemporaryModel = Boolean(existingTaskState?.temporaryModel);
             const explicitReturnModel = runtimeCfg.taskModeReturnModel.trim();
             const returnModel = explicitReturnModel || nextTaskState.primaryModel;
-            if (runtimeCfg.taskModeReturnToPrimary && returnModel) {
+            if (returnModel) {
               targetModel = returnModel;
               targetKind = nextTaskState.primaryKind;
               logEvent = hadTemporaryModel ? "task_mode_return_to_primary" : "task_mode_primary_kept";
               logNote = hadTemporaryModel
-                ? `task mode return to ${returnModel} for ${nextTaskState.primaryKind}`
-                : `task mode keep return model ${returnModel} for ${nextTaskState.primaryKind}`;
+                ? `task mode return to ${returnModel} for ${nextTaskState.primaryKind}; min=${getEffectiveTaskModeMinConfidence(runtimeCfg.taskModeMinConfidence)} no_chat_fallback=on`
+                : `task mode keep return model ${returnModel} for ${nextTaskState.primaryKind}; min=${getEffectiveTaskModeMinConfidence(runtimeCfg.taskModeMinConfidence)} no_chat_fallback=on`;
               routingSessionStore.setTaskState(effectiveSessionKey, {
                 ...nextTaskState,
                 temporaryKind: undefined,
                 temporaryModel: undefined,
                 lastRouteAt: Date.now(),
               });
-            } else if (!runtimeCfg.freeSwitchWhenTaskModeOff) {
+            } else {
               routingSessionStore.clearRouteDecision(effectiveSessionKey);
               await appendJsonl(api, {
                 ts: nowIso(),
