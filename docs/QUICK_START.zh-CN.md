@@ -18,6 +18,10 @@
 看这里：
 - `docs/USAGE_MANUAL.txt`
 
+### 想看架构/阶段性设计（归档）
+看这里：
+- `docs/archive/`
+
 ### 想自定义关键词 / 模型 / UI 设置
 看这里：
 - `tools/soft-router-suggest/README_SETTINGS.md`

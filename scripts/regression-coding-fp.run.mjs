@@ -306,7 +306,7 @@ function main() {
   const toolsDir = path.join(repoRoot, "tools", "soft-router-suggest");
 
   const baseLibPath = path.join(toolsDir, "keyword-library.json");
-  const draftPath = path.join(repoRoot, "coding关键词库.txt");
+  const draftPath = path.join(repoRoot, "tools", "soft-router-suggest", "drafts", "coding关键词库.txt");
   const samplesPath = path.join(repoRoot, "scripts", "regression-coding-fp.samples.json");
 
   const baseLib = JSON.parse(fs.readFileSync(baseLibPath, "utf8"));

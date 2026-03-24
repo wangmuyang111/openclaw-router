@@ -1,6 +1,6 @@
 # Coding 关键词库（可读版）
 
-> 来源：`tools/soft-router-suggest/keyword-library.json` + 我们的补丁库（`coding关键词库.txt` part2/3/4），已在 repo 内合并为 keywordSets（但不强制全部接入 signals）。
+> 来源：`tools/soft-router-suggest/keyword-library.json` + 我们的补丁库（`tools/soft-router-suggest/drafts/coding关键词库.txt` part2/3/4），已在 repo 内合并为 keywordSets（但不强制全部接入 signals）。
 >
 > 设计原则：
 > - **强特征**：报错签名 / 错误码 / 包管理命令 / 典型文件名 / 生态工具（更少误命中）

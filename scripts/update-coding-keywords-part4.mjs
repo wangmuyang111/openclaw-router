@@ -1,6 +1,6 @@
 import fs from "node:fs";
 
-const targetPath = new URL("../coding关键词库.txt", import.meta.url);
+const targetPath = new URL("../tools/soft-router-suggest/drafts/coding关键词库.txt", import.meta.url);
 const raw = fs.readFileSync(targetPath, "utf8");
 const obj = JSON.parse(raw);
 

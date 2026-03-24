@@ -1,7 +1,7 @@
 import fs from "node:fs";
 
 const libPath = new URL("../tools/soft-router-suggest/keyword-library.json", import.meta.url);
-const draftPath = new URL("../coding关键词库.txt", import.meta.url);
+const draftPath = new URL("../tools/soft-router-suggest/drafts/coding关键词库.txt", import.meta.url);
 
 const lib = JSON.parse(fs.readFileSync(libPath, "utf8"));
 const draft = JSON.parse(fs.readFileSync(draftPath, "utf8"));
