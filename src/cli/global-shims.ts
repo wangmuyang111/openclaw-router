@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { chmod, mkdir, rm, writeFile } from "node:fs/promises";
+import { chmod, copyFile, mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { getOpenClawHome, getRepoRoot, pathExists } from "./shared.js";
 
@@ -39,16 +39,20 @@ function getDistCliPath(): string {
   return path.join(getRepoRoot(), "dist", "cli", "index.js");
 }
 
-function buildWindowsCmdShim(distCliPath: string): string {
-  const nodePath = process.execPath.replace(/"/g, '""');
-  const cliPath = distCliPath.replace(/"/g, '""');
-  return `@echo off\r\nsetlocal\r\n"${nodePath}" "${cliPath}" %*\r\n`;
+function getScriptWrapperPath(commandName: string): string {
+  const scriptFile = process.platform === "win32" ? "openclaw-router.ps1" : "openclaw-router";
+  return path.join(getRepoRoot(), "scripts", scriptFile);
 }
 
-function buildPosixShim(distCliPath: string): string {
-  const nodePath = process.execPath.replace(/'/g, `'\\''`);
-  const cliPath = distCliPath.replace(/'/g, `'\\''`);
-  return `#!/usr/bin/env sh\nexec '${nodePath}' '${cliPath}' "$@"\n`;
+function buildWindowsCmdShim(scriptWrapperPath: string): string {
+  const ps = "powershell";
+  const wrapper = scriptWrapperPath.replace(/"/g, '""');
+  return `@echo off\r\nsetlocal\r\n"${ps}" -ExecutionPolicy Bypass -File "${wrapper}" %*\r\n`;
+}
+
+function buildPosixShim(scriptWrapperPath: string): string {
+  const wrapper = scriptWrapperPath.replace(/'/g, `'\\''`);
+  return `#!/usr/bin/env sh\nexec '${wrapper}' "$@"\n`;
 }
 
 function getShimPath(binDir: string, commandName: string): string {
@@ -57,6 +61,12 @@ function getShimPath(binDir: string, commandName: string): string {
 
 export async function installGlobalShims(): Promise<ShimInstallResult> {
   const distCliPath = getDistCliPath();
+  const scriptWrapperPath = getScriptWrapperPath("openclaw-router");
+
+  if (!(await pathExists(scriptWrapperPath))) {
+    throw new Error(`Script wrapper not found: ${scriptWrapperPath}`);
+  }
+
   if (!(await pathExists(distCliPath))) {
     throw new Error(`CLI entry not found: ${distCliPath}`);
   }
@@ -67,9 +77,13 @@ export async function installGlobalShims(): Promise<ShimInstallResult> {
   for (const commandName of SHIM_COMMANDS) {
     const shimPath = getShimPath(target.binDir, commandName);
     if (process.platform === "win32") {
-      await writeFile(shimPath, buildWindowsCmdShim(distCliPath), "utf8");
+      await writeFile(shimPath, buildWindowsCmdShim(scriptWrapperPath), "utf8");
     } else {
-      await writeFile(shimPath, buildPosixShim(distCliPath), "utf8");
+      if (commandName === "openclaw-router") {
+        await copyFile(scriptWrapperPath, shimPath);
+      } else {
+        await writeFile(shimPath, buildPosixShim(scriptWrapperPath), "utf8");
+      }
       await chmod(shimPath, 0o755);
     }
   }

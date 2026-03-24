@@ -22,6 +22,10 @@ Available companion commands:
 - `openclaw-router`
 - `openclaw-soft-router`
 
+Implementation note:
+- The companion commands now route through repo wrapper scripts first, so GitHub source installs are more resilient.
+- If `dist/cli/index.js` is missing later, the wrapper can try rebuilding before forwarding.
+
 Example:
 
 ```powershell

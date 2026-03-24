@@ -226,6 +226,7 @@ openclaw-soft-router status
 Notes:
 - This plugin repo does **not** patch the core OpenClaw CLI to inject native `openclaw <subcommand>` entries.
 - Instead, it installs safe companion global commands alongside `openclaw` and keeps them in sync during install / repair / uninstall.
+- Those companion commands now route through repo wrapper scripts, so GitHub source installs are more robust: if `dist/` is missing later, the wrapper can rebuild before forwarding.
 
 ### Linux wrapper scripts
 

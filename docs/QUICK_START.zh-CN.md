@@ -128,6 +128,7 @@ openclaw-soft-router status
 说明：
 - 当前仓库不会直接改 OpenClaw 主程序，把命令硬塞进 `openclaw <子命令>`。
 - 这里采用的是**伴生全局命令**方案，效果接近原生命令，而且 install / repair / uninstall 会自动同步。
+- 伴生命令现在走仓库 wrapper 脚本，因此从 GitHub 下载 / clone 后安装会更稳；即使后面 `dist/` 缺失，wrapper 也能先尝试自动 build 再继续执行。
 
 ---
 
