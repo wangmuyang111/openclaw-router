@@ -42,6 +42,49 @@ If you are new to this repo, read these in order:
 2. `docs/USAGE_MANUAL.txt` — full command manual
 3. `tools/soft-router-suggest/README_SETTINGS.md` — customization guide
 
+## One-screen install (copy this first)
+
+### Windows
+
+```powershell
+npm install
+npm run build
+.\scripts\install.ps1
+openclaw-router status
+openclaw-router rules
+```
+
+### Linux / macOS
+
+```bash
+npm install
+npm run build
+chmod +x scripts/*.sh
+./scripts/install.sh
+openclaw-router status
+openclaw-router rules
+```
+
+### What you get after install
+
+```powershell
+openclaw-router status
+openclaw-router fast
+openclaw-router rules
+openclaw-router llm
+openclaw-router doctor
+openclaw-router repair
+openclaw-router uninstall
+```
+
+### Native OpenClaw form (when supported by your OpenClaw install)
+
+```powershell
+openclaw router status
+openclaw router rules
+openclaw router fast
+```
+
 ## Quick start
 
 ### Windows (shortest path)
@@ -76,10 +119,10 @@ npm run openclaw:doctor
 ### Check / switch modes
 
 ```powershell
-.\scripts\router.ps1 status
-.\scripts\router.ps1 fast
-.\scripts\router.ps1 rules
-.\scripts\router.ps1 llm
+openclaw-router status
+openclaw-router fast
+openclaw-router rules
+openclaw-router llm
 ```
 
 ### Mode meaning

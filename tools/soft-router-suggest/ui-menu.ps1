@@ -1114,6 +1114,30 @@ function Run-TaskModeMenu {
   }
 }
 
+function Run-CliQuickRef {
+  Safe-Clear
+  Write-Host (("=== {0} ===" -f (T 'cli.title'))) -ForegroundColor Cyan
+  Write-Host (T 'cli.subtitle') -ForegroundColor DarkGray
+  Write-Host
+  Write-Host (T 'cli.global') -ForegroundColor Green
+  Write-Host '  openclaw-router status'
+  Write-Host '  openclaw-router fast'
+  Write-Host '  openclaw-router rules'
+  Write-Host '  openclaw-router llm'
+  Write-Host '  openclaw-router doctor'
+  Write-Host '  openclaw-router repair'
+  Write-Host '  openclaw-router uninstall'
+  Write-Host
+  Write-Host (T 'cli.native') -ForegroundColor Cyan
+  Write-Host '  openclaw router status'
+  Write-Host '  openclaw router fast'
+  Write-Host '  openclaw router rules'
+  Write-Host '  openclaw router llm'
+  Write-Host
+  Write-Host (T 'cli.tip') -ForegroundColor DarkGray
+  Wait-AnyKeyOrEsc
+}
+
 function Run-LanguageMenu {
   while ($true) {
     Safe-Clear
@@ -1153,11 +1177,12 @@ while ($true) {
   Write-Host ("5) " + (T 'menu.keywords'))
   Write-Host ("6) " + (T 'menu.preview'))
   Write-Host ("7) " + (T 'menu.taskMode'))
-  Write-Host ("8) " + (T 'menu.language'))
+  Write-Host ("8) " + (T 'menu.cliQuickRef'))
+  Write-Host ("9) " + (T 'menu.language'))
   Write-Host ("0) " + (T 'menu.exit'))
 
   Write-Host ((T 'menu.tipEsc')) -ForegroundColor DarkGray
-  $choice = Read-ChoiceOrEsc (Tf 'prompt.chooseMenu' @(8))
+  $choice = Read-ChoiceOrEsc (Tf 'prompt.chooseMenu' @(9))
   if ($null -eq $choice) { continue }
   try {
     switch ($choice) {
@@ -1245,7 +1270,8 @@ while ($true) {
       '5' { Run-Keywords }
       '6' { Run-Preview }
       '7' { Run-TaskModeMenu }
-      '8' { Run-LanguageMenu }
+      '8' { Run-CliQuickRef }
+      '9' { Run-LanguageMenu }
       '0' { exit 0 }
       default { Write-Host (T 'menu.invalidChoice') -ForegroundColor Yellow; Wait-AnyKeyOrEsc }
     }
