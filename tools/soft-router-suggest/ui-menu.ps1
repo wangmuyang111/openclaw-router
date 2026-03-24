@@ -34,7 +34,7 @@ function Save-JsonFile([string]$path, $obj) {
 
 function Get-DefaultRuntimeRouting {
   return [ordered]@{
-    taskModeEnabled = $true
+    taskModeEnabled = $false
     taskModePrimaryKind = 'coding'
     taskModeKinds = @('coding')
     taskModeDisabledKinds = @()

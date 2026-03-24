@@ -142,7 +142,7 @@ const DEFAULTS = {
   setupPromptEnabled: true,
   setupPromptMaxModels: 3,
 
-  taskModeEnabled: true,
+  taskModeEnabled: false,
   taskModePrimaryKind: "coding",
   taskModeKinds: ["coding"],
   taskModeMinConfidence: "medium" as const,

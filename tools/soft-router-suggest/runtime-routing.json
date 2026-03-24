@@ -1,5 +1,5 @@
 {
-  "taskModeEnabled": true,
+  "taskModeEnabled": false,
   "taskModePrimaryKind": "coding",
   "taskModeKinds": [
     "coding"

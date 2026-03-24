@@ -4,6 +4,15 @@
 
 This guide reflects the **current** keyword-library based toolchain and the current PowerShell control UI behavior.
 
+## Task mode default + persistence
+
+- Fresh install default: `taskModeEnabled = false`
+- Runtime toggle is persisted in: `tools/soft-router-suggest/runtime-routing.json`
+- Restart inherits the previous state:
+  - if last time it was on, next start is on
+  - if last time it was off, next start is off
+- Install / repair preserves an existing `runtime-routing.json`, so user task-mode state is not overwritten anymore
+
 ## Start here first
 
 If you only want the shortest startup commands and a plain-language explanation of the routing logic, read:

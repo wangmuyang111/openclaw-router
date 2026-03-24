@@ -68,6 +68,11 @@ if (-not (Test-Path -LiteralPath $toolSourceDir)) {
 }
 
 Get-ChildItem -LiteralPath $toolSourceDir -Force | ForEach-Object {
+  if ($_.Name -ieq 'runtime-routing.json' -and (Test-Path -LiteralPath (Join-Path $toolsDir $_.Name))) {
+    Write-Host "Preserve existing runtime-routing.json -> $(Join-Path $toolsDir $_.Name)"
+    return
+  }
+
   $src = $_.FullName
   $dst = Join-Path $toolsDir $_.Name
   if ($_.PSIsContainer) {
@@ -90,7 +95,7 @@ if (-not (Test-Path -LiteralPath $overridesDst)) {
 $runtimeRoutingPath = Join-Path $toolsDir 'runtime-routing.json'
 if (-not (Test-Path -LiteralPath $runtimeRoutingPath)) {
   $runtimeJson = @{
-    taskModeEnabled = $true
+    taskModeEnabled = $false
     taskModePrimaryKind = 'coding'
     taskModeKinds = @('coding')
     taskModeDisabledKinds = @()

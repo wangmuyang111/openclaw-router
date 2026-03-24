@@ -55,7 +55,7 @@ function patchOpenClawConfig(rawJson: string): string {
   config.switchingEnabled = false;
   config.switchingAllowChat = false;
   config.openclawCliPath = "openclaw";
-  config.taskModeEnabled = true;
+  config.taskModeEnabled = false;
   config.taskModePrimaryKind = "coding";
   config.taskModeKinds = ["coding"];
   config.taskModeMinConfidence = "medium";
@@ -74,7 +74,7 @@ function patchOpenClawConfig(rawJson: string): string {
 function getDefaultRuntimeRoutingJson(): string {
   return `${JSON.stringify(
     {
-      taskModeEnabled: true,
+      taskModeEnabled: false,
       taskModePrimaryKind: "coding",
       taskModeKinds: ["coding"],
       taskModeDisabledKinds: [],
@@ -88,9 +88,15 @@ function getDefaultRuntimeRoutingJson(): string {
   )}\n`;
 }
 
-async function copyToolDirectoryContents(sourceDir: string, destinationDir: string): Promise<void> {
+async function copyToolDirectoryContents(
+  sourceDir: string,
+  destinationDir: string,
+  options?: { preserveFiles?: string[] },
+): Promise<void> {
+  const preserve = new Set((options?.preserveFiles ?? []).map((value) => value.toLowerCase()));
   const entries = await readdir(sourceDir, { withFileTypes: true });
   for (const entry of entries) {
+    if (preserve.has(entry.name.toLowerCase())) continue;
     const sourcePath = path.join(sourceDir, entry.name);
     const destinationPath = path.join(destinationDir, entry.name);
     if (entry.isDirectory()) {
@@ -125,7 +131,7 @@ async function printDryRunPlan(options: {
   for (const item of options.pluginSources) {
     console.log(`   - ${item.file}: ${item.exists ? "copy" : "skip (not present)"}`);
   }
-  console.log(`4. Copy tool directory contents: ${options.repoToolsDirOk ? "yes" : "blocked (repo tools dir missing)"}`);
+  console.log(`4. Copy tool directory contents: ${options.repoToolsDirOk ? "yes (preserve runtime-routing.json if already present)" : "blocked (repo tools dir missing)"}`);
   if (!options.overridesExists && options.overridesExampleExists) {
     console.log(`5. Create keyword-overrides.user.json from example: ${options.overridesExample}`);
   } else if (!options.overridesExists) {
@@ -204,7 +210,9 @@ export async function runInstall(options: InstallOptions): Promise<number> {
   }
   console.log(`OK: plugin copied -> ${paths.workspacePluginDir}`);
 
-  await copyToolDirectoryContents(paths.repoToolsDir, paths.workspaceToolsDir);
+  await copyToolDirectoryContents(paths.repoToolsDir, paths.workspaceToolsDir, {
+    preserveFiles: runtimeRoutingExists ? ["runtime-routing.json"] : [],
+  });
 
   if (!overridesExists && overridesExampleExists) {
     await copyFile(overridesExample, overridesDst);

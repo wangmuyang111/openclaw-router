@@ -187,7 +187,7 @@
       },
       "taskModeEnabled": {
         "type": "boolean",
-        "default": true,
+        "default": false,
         "description": "Default task mode switch. Runtime menu settings in runtime-routing.json take precedence at execution time."
       },
       "taskModePrimaryKind": {
