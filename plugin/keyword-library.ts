@@ -78,11 +78,22 @@ async function readJsonFile<T>(p: string): Promise<T> {
   return JSON.parse(raw) as T;
 }
 
-function normalizeTokens(list: string[]): string[] {
+type KeywordNormalization = NonNullable<KeywordLibrary["normalization"]>;
+
+function normalizeKeywordToken(token: unknown, normalization?: KeywordNormalization): string {
+  let s = String(token ?? "");
+  const trimEnabled = normalization?.trim !== false;
+  if (trimEnabled) s = s.trim();
+  if (normalization?.collapseWhitespace) s = s.replace(/\s+/g, " ");
+  if (normalization?.lowercase) s = s.toLowerCase();
+  return s;
+}
+
+function normalizeTokens(list: string[], normalization?: KeywordNormalization): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const raw of list ?? []) {
-    const t = String(raw ?? "").trim();
+    const t = normalizeKeywordToken(raw, normalization);
     if (!t) continue;
     if (seen.has(t)) continue;
     seen.add(t);
@@ -91,21 +102,26 @@ function normalizeTokens(list: string[]): string[] {
   return out;
 }
 
-function applySetOverlay(base: string[], add: string[] | undefined, remove: string[] | undefined): string[] {
-  const rm = new Set((remove ?? []).map((x) => String(x).trim()).filter(Boolean));
+function applySetOverlay(
+  base: string[],
+  add: string[] | undefined,
+  remove: string[] | undefined,
+  normalization?: KeywordNormalization,
+): string[] {
+  const rm = new Set((remove ?? []).map((x) => normalizeKeywordToken(x, normalization)).filter(Boolean));
   const out: string[] = [];
   for (const x of base ?? []) {
-    const t = String(x).trim();
+    const t = normalizeKeywordToken(x, normalization);
     if (!t) continue;
     if (rm.has(t)) continue;
     out.push(t);
   }
   for (const x of add ?? []) {
-    const t = String(x).trim();
+    const t = normalizeKeywordToken(x, normalization);
     if (!t) continue;
     out.push(t);
   }
-  return normalizeTokens(out);
+  return normalizeTokens(out, normalization);
 }
 
 export async function loadAndCompileRoutingRules(params?: {
@@ -125,11 +141,13 @@ export async function loadAndCompileRoutingRules(params?: {
     ov = null;
   }
 
+  const normalization = lib.normalization ?? {};
+
   // Build final keywordSets with overlays applied.
   const finalSets: Record<string, string[]> = {};
   for (const [setId, baseList] of Object.entries(lib.keywordSets ?? {})) {
     const overlay = ov?.sets?.[setId];
-    finalSets[setId] = applySetOverlay(baseList ?? [], overlay?.add, overlay?.remove);
+    finalSets[setId] = applySetOverlay(baseList ?? [], overlay?.add, overlay?.remove, normalization);
   }
 
   // If overrides mention unknown sets, warn.
