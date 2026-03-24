@@ -26,6 +26,14 @@ Example:
 
 ```powershell
 openclaw-router status
+openclaw-router fast
+openclaw-router rules
+openclaw-router llm
+openclaw-router doctor
+openclaw-router install
+openclaw-router repair
+openclaw-router uninstall
+
 openclaw-soft-router status
 ```
 
