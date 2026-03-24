@@ -1,5 +1,6 @@
 import { copyFile, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { removeGlobalShims } from "./global-shims.js";
 import { getPaths, printHeader } from "./shared.js";
 
 function getTimestamp(): string {
@@ -64,6 +65,13 @@ export async function runUninstall(options: { removeFiles: boolean }): Promise<n
       console.log("OK: plugin disabled in openclaw.json");
     } else {
       console.log("Note: plugin entry not found; nothing to disable.");
+    }
+
+    const shims = await removeGlobalShims();
+    if (shims.removed.length > 0) {
+      console.log(`OK: global commands removed -> ${shims.removed.join(", ")}`);
+    } else {
+      console.log("Note: no global command shims were found to remove.");
     }
 
     if (options.removeFiles) {

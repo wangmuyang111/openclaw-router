@@ -1,5 +1,6 @@
 import { copyFile, cp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { installGlobalShims } from "./global-shims.js";
 import { getPaths, pathExists, PLUGIN_FILES, printHeader, printKeyValue } from "./shared.js";
 
 type InstallOptions = { dryRun: boolean };
@@ -147,6 +148,7 @@ async function printDryRunPlan(options: {
   console.log("   - config.switchingEnabled = false");
   console.log("   - config.switchingAllowChat = false");
   console.log("   - config.openclawCliPath = 'openclaw'");
+  console.log("8. Refresh global commands: openclaw-router / openclaw-soft-router");
   console.log("");
 
   const blockers: string[] = [];
@@ -234,7 +236,15 @@ export async function runInstall(options: InstallOptions): Promise<number> {
   await writeFile(paths.configPath, patched, "utf8");
   console.log("OK: openclaw.json updated (plugin enabled)");
 
+  const shims = await installGlobalShims();
+  console.log(`OK: global commands refreshed -> ${shims.commands.join(", ")}`);
+  console.log(`Shim dir: ${shims.binDir}`);
+  if (shims.usedFallback) {
+    console.log("Note: openclaw binary dir could not be detected, using fallback ~/.openclaw/bin");
+  }
+
   console.log("\nNext steps:");
+  console.log("  - Use openclaw-router status");
   console.log("  - Use scripts\\router.ps1 for mode switching (FAST/RULES/LLM)");
   console.log("  - Start sidecar: scripts\\sidecar-start.ps1");
   return 0;

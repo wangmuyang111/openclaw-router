@@ -205,6 +205,20 @@ npm run openclaw:uninstall
 .\scripts\uninstall.ps1
 ```
 
+### Global command shims
+
+After `install` / `repair`, this repo refreshes global companion commands automatically.
+After `uninstall`, those companion commands are removed automatically.
+
+```powershell
+openclaw-router status
+openclaw-soft-router status
+```
+
+Notes:
+- This plugin repo does **not** patch the core OpenClaw CLI to inject native `openclaw <subcommand>` entries.
+- Instead, it installs safe companion global commands alongside `openclaw` and keeps them in sync during install / repair / uninstall.
+
 ### Linux wrapper scripts
 
 ```bash

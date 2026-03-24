@@ -13,6 +13,22 @@ This guide reflects the **current** keyword-library based toolchain and the curr
   - if last time it was off, next start is off
 - Install / repair preserves an existing `runtime-routing.json`, so user task-mode state is not overwritten anymore
 
+## Global command shims
+
+After `install` / `repair`, the repo refreshes global command shims automatically.
+After `uninstall`, those shims are removed automatically.
+
+Available companion commands:
+- `openclaw-router`
+- `openclaw-soft-router`
+
+Example:
+
+```powershell
+openclaw-router status
+openclaw-soft-router status
+```
+
 ## Start here first
 
 If you only want the shortest startup commands and a plain-language explanation of the routing logic, read:

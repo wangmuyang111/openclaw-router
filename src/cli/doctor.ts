@@ -1,4 +1,5 @@
 import path from "node:path";
+import { inspectGlobalShims } from "./global-shims.js";
 import { detectOpenClawCli, detectSidecarHealth, getPaths, pathExists, PLUGIN_FILES, printHeader, printKeyValue } from "./shared.js";
 
 export async function runDoctor(): Promise<number> {
@@ -68,6 +69,13 @@ export async function runDoctor(): Promise<number> {
   }
   if (missingRepoPluginFiles.length > 0) {
     warnings.push(`Optional legacy plugin files missing in repo: ${missingRepoPluginFiles.join(", ")}`);
+  }
+
+  const shims = await inspectGlobalShims();
+  const installedShimNames = shims.commands.filter((item) => item.exists).map((item) => item.name);
+  printKeyValue("global commands", installedShimNames.length > 0 ? installedShimNames.join(", ") : "MISSING");
+  if (installedShimNames.length === 0) {
+    warnings.push(`Global command shims are missing under: ${shims.binDir ?? "(unknown)"}`);
   }
 
   const sidecarHealthy = await detectSidecarHealth();

@@ -108,6 +108,19 @@ node ./dist/cli/index.js doctor
 - `rules` = 开启规则引擎
 - `llm` = 规则引擎 + Router LLM sidecar
 
+### 全局命令（安装 / 修复后自动同步）
+
+安装或 repair 后，会自动刷新全局命令；卸载时会自动删除。
+
+```powershell
+openclaw-router status
+openclaw-soft-router status
+```
+
+说明：
+- 当前仓库不会直接改 OpenClaw 主程序，把命令硬塞进 `openclaw <子命令>`。
+- 这里采用的是**伴生全局命令**方案，效果接近原生命令，而且 install / repair / uninstall 会自动同步。
+
 ---
 
 ## 4. 关键词加权机制（人话版）
