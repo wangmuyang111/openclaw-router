@@ -13,7 +13,7 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..') | Select-Object -ExpandProperty Path
 $distCli = Join-Path $repoRoot 'dist\cli\index.js'
-$legacyInstall = Join-Path $PSScriptRoot 'install.legacy.ps1'
+$legacyInstall = Join-Path $PSScriptRoot 'legacy\install.legacy.ps1'
 
 function Invoke-LegacyInstall {
   Write-Host "Repo: $repoRoot"

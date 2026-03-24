@@ -19,7 +19,7 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..') | Select-Object -ExpandProperty Path
 $distCli = Join-Path $repoRoot 'dist\cli\index.js'
-$legacyUninstall = Join-Path $PSScriptRoot 'uninstall.legacy.ps1'
+$legacyUninstall = Join-Path $PSScriptRoot 'legacy\uninstall.legacy.ps1'
 
 function Invoke-LegacyUninstall {
   Write-Host "Repo: $repoRoot"

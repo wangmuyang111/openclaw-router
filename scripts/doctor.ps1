@@ -13,7 +13,7 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..') | Select-Object -ExpandProperty Path
 $distCli = Join-Path $repoRoot 'dist\cli\index.js'
-$legacyDoctor = Join-Path $PSScriptRoot 'doctor.legacy.ps1'
+$legacyDoctor = Join-Path $PSScriptRoot 'legacy\doctor.legacy.ps1'
 
 function Invoke-LegacyDoctor {
   Write-Host "Repo: $repoRoot"
