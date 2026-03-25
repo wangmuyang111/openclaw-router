@@ -2152,7 +2152,30 @@
       "exit code",
       "command not found",
       "permission denied",
-      "GitHub Actions"
+      "GitHub Actions",
+      "warning:",
+      "warn:",
+      "fatal:",
+      "critical:",
+      "assert failed",
+      "assertion failed",
+      "segfault",
+      "bus error",
+      "illegal instruction",
+      "floating point exception",
+      "stack overflow",
+      "heap corruption",
+      "double free",
+      "use after free",
+      "aborted",
+      "abort trap",
+      "terminated",
+      "sigabrt",
+      "sigill",
+      "sigbus",
+      "sigfpe",
+      "sigkill",
+      "segmentation fault (core dumped)"
     ],
     "coding.conservative.safe.strong": [
       "useEffect",
@@ -2255,7 +2278,10 @@
       "JRE",
       "javac",
       "Spring Boot",
-      "Hibernate"
+      "Hibernate",
+      "illegalargumentexception",
+      "indexoutofboundsexception",
+      "arithmeticexception"
     ],
     "coding.feature.js_ts_node.strong": [
       "node_modules",
@@ -2280,7 +2306,19 @@
       "async function",
       "TypeError: Cannot read properties of undefined",
       "ReferenceError:",
-      "SyntaxError:"
+      "SyntaxError:",
+      "unhandled promise rejection",
+      "unhandledpromiserejectionwarning",
+      "deprecationwarning",
+      "maxlisteners",
+      "unexpected token",
+      "cannot read property",
+      "cannot read properties of null",
+      "cannot read properties of undefined",
+      "is not a function",
+      "is not defined",
+      "cannot resolve",
+      "javascript heap out of memory"
     ],
     "coding.feature.kotlin.strong": [
       "data class",
@@ -2336,7 +2374,20 @@
       "AttributeError",
       "numpy",
       "pandas",
-      "asyncio"
+      "asyncio",
+      "exception:",
+      "keyerror:",
+      "valueerror:",
+      "typeerror:",
+      "importerror:",
+      "attributeerror:",
+      "indexerror:",
+      "zerodivisionerror",
+      "filenotfounderror",
+      "nameerror:",
+      "oserror",
+      "permissionerror",
+      "runtimeerror"
     ],
     "coding.feature.risky_or_generic_reference_only.strong": [
       "class ",
@@ -2387,7 +2438,15 @@
       "EXPLAIN",
       "psql",
       "mysql",
-      "sqlite"
+      "sqlite",
+      "syntax error at or near",
+      "duplicate key value violates unique constraint",
+      "violates foreign key constraint",
+      "deadlock detected",
+      "lock wait timeout exceeded",
+      "could not connect to server",
+      "connection refused",
+      "too many connections"
     ],
     "coding.feature.swift_objc.strong": [
       "SwiftUI",
@@ -2920,6 +2979,24 @@
       "^npm\\s+ERR!",
       "^Traceback \\(most recent call last\\):",
       "\\berror\\[E\\d{4}\\]"
+    ],
+    "coding.feature.go.strong": [
+      "runtime error:",
+      "nil pointer dereference",
+      "concurrent map read and map write",
+      "all goroutines are asleep - deadlock!"
+    ],
+    "coding.feature.rust.strong": [
+      "thread 'main' panicked at",
+      "cannot move out of",
+      "unresolved import",
+      "cannot find crate"
+    ],
+    "coding.feature.git.strong": [
+      "error: pathspec",
+      "conflict (content)",
+      "rejected",
+      "non-fast-forward"
     ]
   },
   "kinds": {
@@ -3541,6 +3618,21 @@
           {
             "set": "coding.weak",
             "weight": 1,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.go.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.rust.strong",
+            "weight": 3,
+            "match": "contains"
+          },
+          {
+            "set": "coding.feature.git.strong",
+            "weight": 3,
             "match": "contains"
           }
         ],
