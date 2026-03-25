@@ -4098,7 +4098,8 @@
       "models": {
         "strategy": "priority_list",
         "list": [
-          "local-proxy/gpt-5.2"
+          "local-proxy/gpt-5.2",
+          "local-proxy/gpt-5.4"
         ]
       }
     }
