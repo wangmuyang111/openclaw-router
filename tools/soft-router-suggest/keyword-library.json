@@ -653,15 +653,24 @@
       "RACI",
       "stakeholder",
       "架构",
-      "并发",
-      "concurrency",
-      "分布式",
-      "distributed",
-      "性能",
-      "performance",
-      "deadlock",
-      "安全",
-      "security"
+      "架构设计",
+      "系统设计",
+      "系统架构",
+      "总体架构",
+      "目标架构",
+      "target architecture",
+      "reference architecture",
+      "技术路线",
+      "技术规划",
+      "技术蓝图",
+      "架构蓝图",
+      "operating model",
+      "org design",
+      "组织设计",
+      "治理",
+      "governance",
+      "战略",
+      "strategy"
     ],
     "strategy.weak": [
       "规划",
@@ -696,15 +705,11 @@
       "critical path",
       "资源",
       "resource",
-      "资源分配",
-      "allocation",
       "人力",
       "工时",
       "capacity",
       "capacity planning",
       "bandwidth",
-      "依赖",
-      "dependency",
       "依赖关系",
       "blocker",
       "阻塞",
@@ -712,8 +717,6 @@
       "organization",
       "协调",
       "coordination",
-      "RACI",
-      "stakeholder",
       "alignment",
       "对齐",
       "方案",
@@ -734,9 +737,6 @@
       "TCO",
       "成本收益",
       "策略",
-      "strategy",
-      "治理",
-      "governance",
       "蓝图",
       "blueprint",
       "目标",
@@ -805,7 +805,6 @@
       "strict",
       "形式化",
       "formal",
-      "架构",
       "并发",
       "concurrency",
       "分布式",
@@ -862,11 +861,7 @@
       "install",
       "配置",
       "config",
-      "怎么实现",
-      "实现",
-      "解释",
-      "是什么",
-      "定义"
+      "怎么实现"
     ],
     "support.strong": [
       "只要答案",
@@ -3029,19 +3024,24 @@
         "metadata": [],
         "regex": [
           {
-            "pattern": "\\\brace\\\b",
-            "weight": 3,
-            "flags": "i"
+            "pattern": "\\barchitecture\\b",
+            "flags": "i",
+            "weight": 3
           },
           {
-            "pattern": "\\\barchitecture\\\b",
-            "weight": 3,
-            "flags": "i"
+            "pattern": "\\bsystem\\s+design\\b",
+            "flags": "i",
+            "weight": 3
+          },
+          {
+            "pattern": "\\b(?:target|reference)\\s+architecture\\b",
+            "flags": "i",
+            "weight": 3
           }
         ]
       },
       "thresholds": {
-        "minScore": 2,
+        "minScore": 4,
         "highScore": 7,
         "minStrongHits": 1
       },
