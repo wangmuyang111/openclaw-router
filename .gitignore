@@ -35,6 +35,10 @@ Thumbs.db
 /scripts/*.state.json
 /scripts/*.samples.json
 
+# Local debug scripts (not part of repo)
+/scripts/debug-tail-soft-router-log.js
+/scripts/debug-tail-soft-router-log.mjs
+
 # Generated plugin build artifacts (runtime source-of-truth is .ts)
 /plugin/*.js
 /plugin/*.js.map
