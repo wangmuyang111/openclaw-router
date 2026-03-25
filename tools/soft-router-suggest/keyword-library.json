@@ -4044,7 +4044,7 @@
     },
     "general": {
       "id": "general",
-      "name": "general",
+      "name": "文章写作任务",
       "priority": 30,
       "enabled": true,
       "signals": {
