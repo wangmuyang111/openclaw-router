@@ -2198,7 +2198,7 @@ export default function register(api: OpenClawPluginApi) {
                 .slice(0, cfg.setupPromptMaxModels);
               if (missing.length > 0) {
                 lastSetupPromptAtMs = now;
-                parts.push("setup: detected models without tags 鈫?add via ops.ps1 tags-set");
+                parts.push("setup: detected models without tags -> add via ops.ps1 tags-set");
                 for (const m of missing) {
                   const entry = catalog.models.find((x) => x.key === m);
                   const inferred = entry ? inferTagsFromCatalog(entry) : [];
