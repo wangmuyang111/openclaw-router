@@ -1303,6 +1303,35 @@ function areModelsEquivalent(a: string, b: string): boolean {
   return left.some((value) => right.has(value));
 }
 
+async function buildRuntimeRouteDecision(params: {
+  api: OpenClawPluginApi;
+  prompt: string;
+  sessionKey: string;
+  conversationId?: string;
+  channelId?: string;
+  messageHash: string;
+  source: RouteDecision['source'];
+}): Promise<RouteDecision> {
+  const suggestion = await classifyDynamic(params.api, params.prompt, undefined);
+  const now = Date.now();
+  return {
+    sessionKey: params.sessionKey,
+    conversationId: params.conversationId,
+    channelId: params.channelId,
+    messageId: undefined,
+    messageHash: params.messageHash,
+    contentPreview: preview(params.prompt, 120),
+    kind: suggestion.kind,
+    confidence: suggestion.confidence,
+    candidateModel: suggestion.model,
+    reason: suggestion.reason,
+    signals: Array.isArray(suggestion.signals) ? suggestion.signals : [],
+    createdAtMs: now,
+    expiresAtMs: now + ROUTE_DECISION_TTL_MS,
+    source: params.source,
+  };
+}
+
 function getPriorityListForKind(priorityFile: ModelPriorityFile | null, kind: string): string[] {
   if (!priorityFile?.kinds) return [];
   const direct = Array.isArray(priorityFile.kinds[kind]) ? priorityFile.kinds[kind] : [];
@@ -1521,6 +1550,21 @@ export default function register(api: OpenClawPluginApi) {
         const promptHash = runtimeMessageHash.hash;
         const agentId = ctxAny?.agentId;
         const runtimeCfg = await getRuntimeRoutingConfig(api);
+        if (!runtimeCfg.taskModeEnabled) {
+          await appendJsonl(api, {
+            ts: nowIso(),
+            type: "soft_router_suggest",
+            event: "route_skip_task_mode_off",
+            pid: process.pid,
+            dryRun: true,
+            sessionKey,
+            agentId,
+            taskModeEnabled: runtimeCfg.taskModeEnabled,
+            taskModePrimaryKind: runtimeCfg.taskModePrimaryKind,
+            taskModeKinds: runtimeCfg.taskModeKinds,
+          });
+          return;
+        }
 
         const attemptedConversationId =
           String(ctxAny?.conversationId ?? ctx.conversationId ?? "").trim() || undefined;
@@ -1529,8 +1573,8 @@ export default function register(api: OpenClawPluginApi) {
           conversationId: attemptedConversationId,
           messageHash: promptHash,
         });
-        const decision = match.decision;
-        const trust = getRouteTrustDecision({
+        let decision = match.decision;
+        let trust = getRouteTrustDecision({
           matchSource: match.source,
           runtimeIdentitySource: runtimeIdentity.source,
           decision,
@@ -1551,8 +1595,36 @@ export default function register(api: OpenClawPluginApi) {
             runtimeIdentitySource: runtimeIdentity.source,
             trustLevel: trust.level,
             trustReason: trust.reason,
+            taskModeEnabled: runtimeCfg.taskModeEnabled,
           });
-          return;
+
+          decision = await buildRuntimeRouteDecision({
+            api,
+            prompt: promptText,
+            sessionKey,
+            conversationId: attemptedConversationId,
+            channelId: ctx.channelId,
+            messageHash: promptHash,
+            source: "before_agent_start",
+          });
+          trust = { trusted: true, level: "direct", reason: "task_mode_runtime_classification" };
+
+          await appendJsonl(api, {
+            ts: nowIso(),
+            type: "soft_router_suggest",
+            event: "route_runtime_classified",
+            pid: process.pid,
+            dryRun: true,
+            sessionKey,
+            attemptedConversationId,
+            attemptedMessageHash: promptHash,
+            attemptedMessageHashSource: runtimeMessageHash.source,
+            agentId,
+            kind: decision.kind,
+            confidence: decision.confidence,
+            candidateModel: decision.candidateModel,
+            taskModeEnabled: runtimeCfg.taskModeEnabled,
+          });
         }
 
         if (decision.expiresAtMs <= Date.now()) {
@@ -1914,6 +1986,23 @@ export default function register(api: OpenClawPluginApi) {
         const messageIdentity = resolveRouteSessionIdentityFromMessageContext(ctx, event);
         const routeSessionKey = messageIdentity.key;
         const runtimeCfg = await getRuntimeRoutingConfig(api);
+        if (!runtimeCfg.taskModeEnabled) {
+          await appendJsonl(api, {
+            ts: nowIso(),
+            type: "soft_router_suggest",
+            event: "route_cache_skip_task_mode_off",
+            dryRun: true,
+            sessionKey: routeSessionKey,
+            channelId: ctx.channelId,
+            accountId: ctx.accountId,
+            conversationId: ctx.conversationId,
+            kind: suggestion.kind,
+            confidence: suggestion.confidence,
+            candidateModel: suggestion.model,
+            taskModeEnabled: runtimeCfg.taskModeEnabled,
+          });
+          return;
+        }
         const messageMetadata = (event.metadata ?? {}) as Record<string, unknown>;
         const rawMessageId = messageMetadata.messageId ?? messageMetadata.message_id ?? messageMetadata.id;
         const messageId = typeof rawMessageId === "string" ? rawMessageId : undefined;
