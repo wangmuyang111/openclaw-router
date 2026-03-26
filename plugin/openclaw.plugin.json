@@ -241,6 +241,7 @@
           "type": "string"
         },
         "default": [
+          "local-proxy/gpt-5.4",
           "local-proxy/gpt-5.2"
         ],
         "description": "Router LLM fallback chain (first available is used) for routing decisions."

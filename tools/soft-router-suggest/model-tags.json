@@ -1,10 +1,15 @@
 {
   "version": 1,
   "tags": {
+    "local-proxy/gpt-5.4": {
+      "input": ["text", "image"],
+      "tools": true,
+      "notes": "Pinned default. Used as the default execution model."
+    },
     "local-proxy/gpt-5.2": {
       "input": ["text", "image"],
       "tools": true,
-      "notes": "Pinned default. All routing currently uses this model only."
+      "notes": "Fallback default (kept for compatibility / downgrade)."
     }
   }
 }

@@ -402,7 +402,7 @@ function providerFromModel(model: string): string {
 /**
  * Embedded runner + OpenAI-compatible gateways (like our local-proxy) expect the HTTP `model` field
  * to be a *providerless* model id (e.g. "gpt-5.2"), not an OpenClaw catalog key like
- * "local-proxy/gpt-5.2".
+ * "local-proxy/gpt-5.4".
  *
  * When we return modelOverride from before_agent_start, OpenClaw may pass it through to the provider.
  * To avoid 502 loops ("unknown provider for model local-proxy/...") we normalize here.
@@ -915,9 +915,9 @@ async function classifyDynamic(
           maxExplainTerms: 10,
         });
 
-        // Per requirement: do NOT switch models lightly. Keep execution on gpt-5.2 by default.
+        // Per requirement: do NOT switch models lightly. Keep execution on gpt-5.4 by default.
         // The router still computes kind/confidence/explanations; model switching (if ever) is handled separately.
-        const model = "local-proxy/gpt-5.2";
+        const model = "local-proxy/gpt-5.4";
 
         const signals = [
           "weighted_keyword_library",
@@ -936,7 +936,7 @@ async function classifyDynamic(
         // Fully converged: do not fall back to legacy classifier.
         return {
           kind: "fallback",
-          model: "local-proxy/gpt-5.2",
+          model: "local-proxy/gpt-5.4",
           reason: `Keyword-library classification error: ${err instanceof Error ? err.message : String(err)}`,
           signals: ["error_fallback", "weighted_keyword_library"],
           confidence: "low",
@@ -947,7 +947,7 @@ async function classifyDynamic(
     // Fully converged: keyword routing is required; if disabled, we still do not load legacy rules.
     return {
       kind: "fallback",
-      model: "local-proxy/gpt-5.2",
+      model: "local-proxy/gpt-5.4",
       reason: "Keyword-library routing disabled (keywordCustomEnabled=false); using fallback.",
       signals: ["fallback:keyword_routing_disabled"],
       confidence: "low",
@@ -955,7 +955,7 @@ async function classifyDynamic(
   } catch (err) {
     return {
       kind: "fallback",
-      model: "local-proxy/gpt-5.2",
+      model: "local-proxy/gpt-5.4",
       reason: `Classification error: ${err instanceof Error ? err.message : String(err)}`,
       signals: ["error_fallback"],
       confidence: "low",
@@ -964,8 +964,8 @@ async function classifyDynamic(
 }
 
 function pickFallbackModel(kind: Suggestion["kind"]) {
-  // Keep it simple and reliable: always use gpt-5.2 as the hard fallback.
-  return "local-proxy/gpt-5.2";
+  // Keep it simple and reliable: always use gpt-5.4 as the hard fallback.
+  return "local-proxy/gpt-5.4";
 }
 
 async function computeAvailability(params: {

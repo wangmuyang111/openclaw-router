@@ -7,7 +7,28 @@ OpenClaw Soft Router（soft-router-suggest）命令手册
 - 如果你想改关键词 / 模型 / 设置，请看：`tools/soft-router-suggest/README_SETTINGS.md`
 
 ============================================================
-0) 最短命令（先抄这个）
+0) CLI 命令速查
+============================================================
+推荐优先使用全局 openclaw-router 命令；若你的 OpenClaw 主程序已支持，也可使用 openclaw router ...
+
+全局伴生命令（默认可用）
+  openclaw-router status
+  openclaw-router fast
+  openclaw-router rules
+  openclaw-router llm
+  openclaw-router doctor
+  openclaw-router install
+  openclaw-router repair
+  openclaw-router uninstall
+
+原生 OpenClaw 子命令（主仓库支持后可用）
+  openclaw router status
+  openclaw router fast
+  openclaw router rules
+  openclaw router llm
+
+============================================================
+1) 最短命令（先抄这个）
 ============================================================
 Windows：
 

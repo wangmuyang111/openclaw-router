@@ -138,6 +138,25 @@ openclaw-soft-router status
 - 这里采用的是**伴生全局命令**方案，效果接近原生命令，而且 install / repair / uninstall 会自动同步。
 - 伴生命令现在走仓库 wrapper 脚本，因此从 GitHub 下载 / clone 后安装会更稳；即使后面 `dist/` 缺失，wrapper 也能先尝试自动 build 再继续执行。
 
+=== CLI 命令速查 ===
+推荐优先使用全局 openclaw-router 命令；若你的 OpenClaw 主程序已支持，也可使用 openclaw router ...
+
+全局伴生命令（默认可用）
+  openclaw-router status
+  openclaw-router fast
+  openclaw-router rules
+  openclaw-router llm
+  openclaw-router doctor
+  openclaw-router install
+  openclaw-router repair
+  openclaw-router uninstall
+
+原生 OpenClaw 子命令（主仓库支持后可用）
+  openclaw router status
+  openclaw router fast
+  openclaw router rules
+  openclaw router llm
+
 ---
 
 ## 4. 关键词加权机制（人话版）
