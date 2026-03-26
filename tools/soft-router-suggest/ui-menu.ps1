@@ -1121,6 +1121,7 @@ function Run-CliQuickRef {
   Write-Host '  openclaw-router rules'
   Write-Host '  openclaw-router llm'
   Write-Host '  openclaw-router doctor'
+  Write-Host '  openclaw-router install'
   Write-Host '  openclaw-router repair'
   Write-Host '  openclaw-router uninstall'
   Write-Host

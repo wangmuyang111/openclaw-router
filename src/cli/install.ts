@@ -45,6 +45,26 @@ function patchOpenClawConfig(rawJson: string): string {
   const parsed = JSON.parse(rawJson) as Record<string, unknown>;
 
   const root = ensureObjectRecord(parsed);
+
+  // Also patch the OpenClaw gateway default agent model conservatively.
+  // Only override when the primary is missing or still on the old baseline (gpt-5.2).
+  const agents = ensureObjectRecord(root.agents);
+  const defaults = ensureObjectRecord(agents.defaults);
+  const modelDefaults = ensureObjectRecord(defaults.model);
+  const primary = typeof modelDefaults.primary === "string" ? modelDefaults.primary : "";
+  if (!primary || primary === "local-proxy/gpt-5.2") {
+    modelDefaults.primary = "local-proxy/gpt-5.4";
+  }
+  const existingFallbacks = Array.isArray(modelDefaults.fallbacks)
+    ? (modelDefaults.fallbacks.filter((x) => typeof x === "string") as string[])
+    : [];
+  if (!existingFallbacks.includes("local-proxy/gpt-5.2")) {
+    modelDefaults.fallbacks = ["local-proxy/gpt-5.2", ...existingFallbacks];
+  }
+  defaults.model = modelDefaults;
+  agents.defaults = defaults;
+  root.agents = agents;
+
   const plugins = ensureObjectRecord(root.plugins);
   const entries = ensureObjectRecord(plugins.entries);
   const entry = ensureObjectRecord(entries["soft-router-suggest"]);
