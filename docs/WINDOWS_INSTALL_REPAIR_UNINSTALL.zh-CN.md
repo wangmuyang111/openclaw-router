@@ -200,12 +200,15 @@ cd %USERPROFILE%\\Desktop\\OpenClaw-SoftRouter-GitHub
 
 推荐统一思路：
 
-1. **先运行 `doctor.ps1` 看问题是什么**
+1. **先运行 `doctor.ps1` 看问题是什么**（只读检查，不会改文件）
 2. 再根据问题类型选择：
+   - **已知 bug 修复 / 需要把 repo 最新 plugin 同步到本机**：优先 `openclaw-router repair`（或 `openclaw-router install`）
    - 只重装插件和工具：`install.ps1`
    - 重置工具库到基线版本：`RESET_TO_BASELINE.ps1`
    - 调整/重置运行模式：`router.ps1 fast/rules/llm`
    - 必要时，使用备份的 `openclaw.json.bak.*` 回滚
+
+> 关键点：`openclaw-router doctor` 不会修复任何东西；真正“修复并同步文件”的是 `install/repair`。
 
 下面按常见场景拆开说明。
 

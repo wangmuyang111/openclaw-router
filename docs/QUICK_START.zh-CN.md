@@ -116,6 +116,10 @@ node ./dist/cli/index.js doctor
 
 安装或 repair 后，会自动刷新全局命令；卸载时会自动删除。
 
+> 修复某个已知 bug（比如插件文件里有一行乱码/错误字符串）时：
+> 只要你已经把仓库更新到包含修复的版本（git pull / 重新下载 / npm upgrade），再运行一次 `openclaw-router repair`（或 `install`）即可把最新 plugin 同步到本机 OpenClaw workspace。
+> 注意：`doctor` 只做检查，不会改文件。
+
 ```powershell
 openclaw-router status
 openclaw-router fast
